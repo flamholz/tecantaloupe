@@ -46,35 +46,22 @@ class WellLabelMapping(dict):
         
 
 class PlateTimeCourse(object):
-
-    def __init__(self, well_dict):
-        self.well_dict = well_dict
-
-    @staticmethod
-    def FromFile(f):
-        well_dict = {}
-        for line in f:
-            if line.startswith('<>'):
-                continue  # Skip header lines.
-            
-            row_data = line.strip().split("\t")
-            row_label = row_data[0]
-            
-            # First entry in line is the row label.
-            for i, cell in enumerate(row_data[1:]):
-                cell_label = '%s%02d' % (row_label, i+1)
-                cell_data = float(cell)
-                well_dict.setdefault(cell_label, []).append(cell_data)
-                
-        return PlateTimeCourse(well_dict)
+    """Immutable plate data with convenience methods for computations."""
     
-    @staticmethod
-    def FromFilename(fname):
-        with open(fname) as f:
-            return PlateTimeCourse.FromFile(f)     
+    def __init__(self, well_dict):
+        self._well_dict = well_dict
+        self._smoothed_well_dict = None
+        self._corrected_well_dict = None
+        
+    @property
+    def well_dict(self):
+        return self._well_dict
     
     @property
     def smoothed_well_dict(self):
+        if self._smoothed_well_dict is not None:
+            return self._smoothed_well_dict
+        
         smooth_dict = {}
         # First round of smoothing - rolling mean of 3.
         for well_key, well_data in self.well_dict.iteritems():
@@ -100,10 +87,14 @@ class PlateTimeCourse(object):
             smoother = pandas.rolling_mean(time_series, 3)
             smoother_dict[well_key] = smoother.tolist()
         
+        self._smoothed_well_dict = smoother_dict
         return smoother_dict
     
     @property
     def corrected_smoothed_well_dict(self):
+        if self._corrected_well_dict is not None:
+            return self._corrected_well_dict
+        
         corrected_well_dict = {}
     
         # Transforms the smoothened curve by
@@ -121,6 +112,7 @@ class PlateTimeCourse(object):
             
             corrected_well_dict[well_key] = corrected_well_data
     
+        self._corrected_well_dict = corrected_well_dict
         return corrected_well_dict    
     
     def GetDoublingTimesAndLags(self, run_time, measurement_interval=30):
