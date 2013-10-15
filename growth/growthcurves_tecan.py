@@ -1,4 +1,4 @@
-"""Jeremy and Hana's tecan data prcessing script Brem Lab. Tweaks by Chris Nelson 2013
+"""Avi's take on the Brem lab's tecan processing script.
 
 usage: python growthcurves_tecan.py tecanDataFile.asc > outputFileName.txt
 
@@ -12,28 +12,28 @@ import sys
 
 
 def SmoothData(well_dict):
-	"""
-	Args:
-		well_dict: a dictionary mapping wells => [timepoint values] as the value
-	
-	Returns:
-		A new well_dict with averages for every point between the two
-		points on either side.
-	"""
+    """
+    Args:
+        well_dict: a dictionary mapping wells => [timepoint values] as the value
+    
+    Returns:
+        A new well_dict with averages for every point between the two
+        points on either side.
+    """
     smooth_dict = {}
 
     for well, values in well_dict.iteritems():
         
         smooth_values = np.zeroes(len(values))
-		# Don't average the first or last cuz we can't 
-		n = len(values)
-		smooth_values[0] = values[0]
-		smooth_values[n-1] = values[-1]
-		
+        # Don't average the first or last cuz we can't 
+        n = len(values)
+        smooth_values[0] = values[0]
+        smooth_values[n-1] = values[-1]
+        
         for i, value in enumerate(values[1:-1]):
-	        real_index = i + 1
-			previous_and_next = (values[i], values[i+2])
-			smooth_values[real_index] = np.mean(previous_and_next)
+            real_index = i + 1
+            previous_and_next = (values[i], values[i+2])
+            smooth_values[real_index] = np.mean(previous_and_next)
             
         smooth_dict[well] = map(lambda x: x - min(smooth_values) + 0.00001, smooth_values)
     return smooth_dict
@@ -80,12 +80,12 @@ def CorrectCurves(smooth_well_dict):
     return corrected_well_dict
 
 def CalcDoublingTimeAndLag(corrected_well_dict,
-						   timepoint_interval=30):
+                           timepoint_interval=30):
     """
-	Args:
-		corrected_well_dict:
-		timepoint_interval: the number of minutes between readings.
-	"""
+    Args:
+        corrected_well_dict:
+        timepoint_interval: the number of minutes between readings.
+    """
     slope_and_lag_dict = {}
     
     for well in corrected_well_dict:
@@ -133,41 +133,68 @@ def PrintOutput(efficiency_dict, slope_and_lag_dict, corrected_well_dict):
         
         print well, "\t", str(slope_and_lag_dict[well][0]), "\t", str(slope_and_lag_dict[well][1]), "\t", str(efficiency_dict[well]), "\t", "\t".join(map(lambda x: str(x), corrected_well_dict[well]))
 
+def ParseTecanOld(input_filename):
+    wells = {}
+    with open(input_filename) as f:
+        for line in f:
+            if not line.strip().split():
+                # Skip blank lines. changed by chris 5/3/12
+                continue
+            elif line.startswith('0s') or line[6] == 'C':
+                continue
+            elif line.startswith('Date'):
+                break
+            elif len(line[:-1].split()) > 2:
+                data = line[:-1].split()
+                wells[data[-1]] = [float(OD) for OD in data[:-1]]
+            else:
+                continue
+    
+    # Filter out empty wells.
+    # NOTE(flamholz): can't use iteritems if deleting inside the loop (I think).
+    for well_name, well_values in wells.items():
+        if not well_values:
+            del wells[well_name]
+    return wells
+
 def ParseTecan(input_filename):
-	wells = {}
-	with open(input_file) as input:
-		for line in input:
-			if not line.strip().split():
-				# Skip blank lines. changed by chris 5/3/12
-				continue
-		    elif line.startswith('0s') or line[6] == 'C':
-		        continue
-		    elif line.startswith('Date'):
-		        break
-		    elif len(line[:-1].split()) > 2:
-		        data = line[:-1].split()
-		        wells[data[-1]] = [float(OD) for OD in data[:-1]]
-		    else:
-		        continue
-	
-	# Filter out empty wells.
-	# NOTE(flamholz): can't use iteritems if deleting inside the loop (I think).
-	for well_name, well_values in wells.items():
-		if not well_values:
-	        del wells[well_name]
-	return wells
-	
+    wells = {}
+    with open(input_filename) as f:
+        for line in f:
+            if not line.strip().split():
+                # Skip blank lines. changed by chris 5/3/12
+                continue
+            elif line.startswith('0s') or line[6] == 'C':
+                continue
+            elif line.startswith('Date'):
+                break
+            elif len(line[:-1].split()) > 2:
+                data = line[:-1].split()
+                wells[data[-1]] = [float(OD) for OD in data[:-1]]
+            else:
+                continue
+
+    # Filter out empty wells.
+    # NOTE(flamholz): can't use iteritems if deleting inside the loop (I think).
+    for well_name, well_values in wells.items():
+        if not well_values:
+            del wells[well_name]
+    return wells
+
+
+
+    
 
 def Main():
-	input_filename = sys.argv[1]
-	wells = ParseTecan(input_filename)
+    input_filename = sys.argv[1]
+    wells = ParseTecan(input_filename)
 
-	smooth_dict = SmoothData(wells)
-	efficiency_dict = GetEfficiency(smooth_dict)
-	corrected_well_dict = CorrectCurves(smooth_dict)
-	slope_and_lag_dict = CalcDoublingTimeAndLag(corrected_well_dict)
-	PrintOutput(efficiency_dict, slope_and_lag_dict, smooth_dict)
+    smooth_dict = SmoothData(wells)
+    efficiency_dict = GetEfficiency(smooth_dict)
+    corrected_well_dict = CorrectCurves(smooth_dict)
+    slope_and_lag_dict = CalcDoublingTimeAndLag(corrected_well_dict)
+    PrintOutput(efficiency_dict, slope_and_lag_dict, smooth_dict)
 
 
 if __name__ == '__main__':
-	Main()
+    Main()
