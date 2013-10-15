@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-import numpy as np
-import matplotlib.colors as colors
 from scipy import stats
+import matplotlib.colors as colors
+import numpy as np
+import pandas
 
 import csv
 import pylab
@@ -70,22 +71,16 @@ class PlateTimeCourse(object):
     @staticmethod
     def FromFilename(fname):
         with open(fname) as f:
-            return PlateTimeCourse.FromFile(f)
-        
+            return PlateTimeCourse.FromFile(f)     
     
     @property
     def smoothed_well_dict(self):
         smooth_dict = {}
-        # First round of smoothing - rolling average.
-        # TODO(flamholz): do this with pandas?
+        # First round of smoothing - rolling mean of 3.
         for well_key, well_data in self.well_dict.iteritems():
-            n_values = len(well_data)
-            smooth_values = np.zeros(n_values)
-            for i, value in enumerate(well_data[1:-1]):
-                real_idx = i + 1
-                values_to_smooth = well_data[i:i+3]
-                smooth_values[real_idx] = np.mean(values_to_smooth)
-            smooth_dict[well_key] = smooth_values.tolist()
+            time_series = pandas.Series(well_data)
+            smoothed = pandas.rolling_mean(time_series, 3)
+            smooth_dict[well_key] = smoothed.tolist()
         
         # Ensure monotonicity.
         for well_data in smooth_dict.itervalues():
@@ -101,12 +96,9 @@ class PlateTimeCourse(object):
         smoother_dict = {}
         for well_key, well_data in smooth_dict.iteritems():
             n_values = len(well_data)
-            smoother_values = np.zeros(n_values)
-            for i, value in enumerate(well_data[1:-1]):
-                real_idx = i + 1
-                values_to_smooth = well_data[i:i+3]
-                smoother_values[real_idx] = np.mean(values_to_smooth)
-            smoother_dict[well_key] = smoother_values.tolist()
+            time_series = pandas.Series(well_data)
+            smoother = pandas.rolling_mean(time_series, 3)
+            smoother_dict[well_key] = smoother.tolist()
         
         return smoother_dict
     
