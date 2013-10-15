@@ -83,11 +83,9 @@ class PlateTimeCourse(object):
             smooth_values = np.zeros(n_values)
             for i, value in enumerate(well_data[1:-1]):
                 real_idx = i + 1
-                prev_value = well_data[i]
-                cur_value = well_data[i]
-                next_value = well_data[i+2]
-                smooth_values[real_idx] = np.mean((prev_value, cur_value, next_value))
-                smooth_dict[well_key] = smooth_values.tolist()
+                values_to_smooth = well_data[i:i+3]
+                smooth_values[real_idx] = np.mean(values_to_smooth)
+            smooth_dict[well_key] = smooth_values.tolist()
         
         # Ensure monotonicity.
         for well_data in smooth_dict.itervalues():
@@ -106,11 +104,9 @@ class PlateTimeCourse(object):
             smoother_values = np.zeros(n_values)
             for i, value in enumerate(well_data[1:-1]):
                 real_idx = i + 1
-                prev_value = well_data[i]
-                cur_value = well_data[i]
-                next_value = well_data[i+2]
-                smoother_values[real_idx] = np.mean((prev_value, cur_value, next_value))
-                smoother_dict[well_key] = smoother_values.tolist()
+                values_to_smooth = well_data[i:i+3]
+                smoother_values[real_idx] = np.mean(values_to_smooth)
+            smoother_dict[well_key] = smoother_values.tolist()
         
         return smoother_dict
     
