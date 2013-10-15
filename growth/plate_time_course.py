@@ -53,6 +53,29 @@ class PlateTimeCourse(object):
         self._smoothed_well_dict = None
         self._corrected_well_dict = None
         
+    @staticmethod
+    def FromFile(f):
+        well_dict = {}
+        for line in f:
+            if line.startswith('<>'):
+                continue  # Skip header lines.
+            
+            row_data = line.strip().split("\t")
+            row_label = row_data[0]
+            
+            # First entry in line is the row label.
+            for i, cell in enumerate(row_data[1:]):
+                cell_label = '%s%02d' % (row_label, i+1)
+                cell_data = float(cell)
+                well_dict.setdefault(cell_label, []).append(cell_data)
+                
+        return PlateTimeCourse(well_dict)
+    
+    @staticmethod
+    def FromFilename(fname):
+        with open(fname) as f:
+            return PlateTimeCourse.FromFile(f)    
+    
     @property
     def well_dict(self):
         return self._well_dict
