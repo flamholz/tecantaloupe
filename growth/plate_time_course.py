@@ -201,6 +201,13 @@ class PlateTimeCourse(object):
     
     def PlotDoublingTimeByLabels(self, label_mapping, run_time,
                                  measurement_interval=30.0):
+        """Produces a boxplot of the per-label doubling times.
+        
+        Args:
+            label_mapping: the mapping from wells to labels.
+            run_time: the total running time of the experiment.
+            measurement_interval: frequency of measurements, minutes.
+        """
         inverse_mapping = label_mapping.InverseMapping()
         doubling_times_and_lags = self.GetDoublingTimesAndLags(
             run_time, measurement_interval)
