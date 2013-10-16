@@ -85,15 +85,11 @@ class PlateTimeCourse(object):
         if self._smoothed_well_dict is not None:
             return self._smoothed_well_dict
         
-        smooth_dict = {}
-        # First round of smoothing - rolling mean of 3.
-        for well_key, well_data in self.well_dict.iteritems():
-            time_series = pandas.Series(well_data)
-            smoothed = pandas.rolling_mean(time_series, 3)
-            smooth_dict[well_key] = smoothed.tolist()
+        df = pandas.DataFrame(self.well_dict)
+        smoothed_df = pandas.rolling_mean(df, 3)
         
         # Ensure monotonicity.
-        for well_data in smooth_dict.itervalues():
+        for well_key, well_data in smoothed_df.iteritems():
             for i, value in enumerate(well_data):
                 if not i:
                     continue
@@ -101,15 +97,11 @@ class PlateTimeCourse(object):
                 if value < well_data[i-1]:
                     well_data[i] = well_data[i-1]
         
-        # Second round of smoothing.
-        # TODO(flamholz): definitely do this with a library method.
-        smoother_dict = {}
-        for well_key, well_data in smooth_dict.iteritems():
-            n_values = len(well_data)
-            time_series = pandas.Series(well_data)
-            smoother = pandas.rolling_mean(time_series, 3)
-            smoother_dict[well_key] = smoother.tolist()
         
+        # Second round of smoothing.
+        smoother_df = pandas.rolling_mean(smoothed_df, 3)
+        smoother_dict = dict((k, v.tolist()) for k,v in smoother_df.iteritems())
+
         self._smoothed_well_dict = smoother_dict
         return smoother_dict
     
@@ -232,6 +224,7 @@ class PlateTimeCourse(object):
         pylab.ylabel('Doubling Time (hours)')
         ticks = np.arange(len(labels))
         pylab.xticks(ticks, labels, rotation='35')
+        pylab.ylim(0, 8)
         
     
     def PlotByLabels(self, label_mapping, measurement_interval=30.0):
@@ -275,4 +268,5 @@ if __name__ == '__main__':
     print 'Filename', args.data_filename
     plate_data = PlateTimeCourse.FromFilename(args.data_filename)
     plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
+    #plate_data.PlotByLabels(well_labels)
     pylab.show()
