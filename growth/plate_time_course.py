@@ -106,7 +106,7 @@ class PlateTimeCourse(object):
         return smoother_dict
     
     @property
-    def corrected_smoothed_well_dict(self):
+    def corrected_log_smoothed_well_dict(self):
         if self._corrected_well_dict is not None:
             return self._corrected_well_dict
         
@@ -116,19 +116,27 @@ class PlateTimeCourse(object):
         # 1) subtracting the initial value which corresponds to media.
         # 2) log transforming and 3)  correcting for growth at high density 
     
+        smoothed_df = pandas.DataFrame(self.smoothed_well_dict)
+        # Extra term is the Warringer correction
+        # See PMID 21698134
+        corrected_df = np.log(smoothed_df + 0.8324*(smoothed_df**3))
+    
+        """    
         smoothed = self.smoothed_well_dict
         for well_key, well_data in smoothed.iteritems():
             corrected_well_data = []
     
             for timepoint, value in enumerate(well_data):
-                # the warringer correction
+                
                 corrected_value = np.log(value + 0.8324*(value**3)) 
                 corrected_well_data.append(corrected_value)
             
             corrected_well_dict[well_key] = corrected_well_data
+        """
     
-        self._corrected_well_dict = corrected_well_dict
-        return corrected_well_dict    
+        corrected_dict = dict((k, v.tolist()) for k,v in corrected_df.iteritems())
+        self._corrected_well_dict = corrected_dict
+        return corrected_well_dict
     
     def GetDoublingTimesAndLags(self, run_time, measurement_interval=30):
         """Computes the doubling times and lags.
