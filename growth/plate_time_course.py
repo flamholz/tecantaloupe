@@ -112,7 +112,10 @@ class PlateTimeCourse(object):
         
         # Extra term is the Warringer correction
         # See PMID 21698134
-        corrected_df = np.log(corrected_df + 0.8324*(smoothed_df**3))
+        #corrected_df = np.log(corrected_df + 0.8324*(corrected_df**3))
+        # TODO(flamholz): think on this...
+        
+        corrected_df = np.log(corrected_df)
         self._corrected_well_df = corrected_df
         return corrected_df
     
@@ -242,5 +245,4 @@ if __name__ == '__main__':
     print 'Filename', args.data_filename
     plate_data = PlateTimeCourse.FromFilename(args.data_filename)
     plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
-    plate_data.PlotByLabels(well_labels)
     pylab.show()
