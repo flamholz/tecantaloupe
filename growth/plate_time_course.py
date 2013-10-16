@@ -1,11 +1,10 @@
 #!/usr/bin/python
 
 from scipy import stats
+import csv
 import matplotlib.colors as colors
 import numpy as np
 import pandas
-
-import csv
 import pylab
 
 
@@ -48,10 +47,10 @@ class WellLabelMapping(dict):
 class PlateTimeCourse(object):
     """Immutable plate data with convenience methods for computations."""
     
-    def __init__(self, well_dict):
-        self._well_dict = well_dict
-        self._smoothed_well_dict = None
-        self._corrected_well_dict = None
+    def __init__(self, well_data_frame):
+        self._well_df = well_data_frame
+        self._smoothed_well_df = None
+        self._corrected_well_df = None
         
     @staticmethod
     def FromFile(f):
@@ -69,24 +68,19 @@ class PlateTimeCourse(object):
                 cell_data = float(cell)
                 well_dict.setdefault(cell_label, []).append(cell_data)
                 
-        return PlateTimeCourse(well_dict)
+        return PlateTimeCourse(pandas.DataFrame(well_dict))
     
     @staticmethod
     def FromFilename(fname):
         with open(fname) as f:
-            return PlateTimeCourse.FromFile(f)    
+            return PlateTimeCourse.FromFile(f)
     
     @property
-    def well_dict(self):
-        return self._well_dict
-    
-    @property
-    def smoothed_well_dict(self):
-        if self._smoothed_well_dict is not None:
-            return self._smoothed_well_dict
+    def smoothed_well_df(self):
+        if self._smoothed_well_df is not None:
+            return self._smoothed_well_df
         
-        df = pandas.DataFrame(self.well_dict)
-        smoothed_df = pandas.rolling_mean(df, 3)
+        smoothed_df = pandas.rolling_mean(self._well_df, 3)
         
         # Ensure monotonicity.
         for well_key, well_data in smoothed_df.iteritems():
@@ -99,46 +93,30 @@ class PlateTimeCourse(object):
         
         
         # Second round of smoothing.
-        smoother_df = pandas.rolling_mean(smoothed_df, 3)
-        smoother_dict = dict((k, v.tolist()) for k,v in smoother_df.iteritems())
-
-        self._smoothed_well_dict = smoother_dict
-        return smoother_dict
+        self._smoothed_well_df = pandas.rolling_mean(smoothed_df, 3)
+        return self._smoothed_well_df
     
     @property
-    def corrected_log_smoothed_well_dict(self):
-        if self._corrected_well_dict is not None:
-            return self._corrected_well_dict
-        
-        corrected_well_dict = {}
-    
+    def corrected_log_smoothed_well_df(self):
+        if self._corrected_well_df is not None:
+            return self._corrected_well_df
+            
         # Transforms the smoothened curve by
         # 1) subtracting the initial value which corresponds to media.
         # 2) log transforming and 3)  correcting for growth at high density 
     
-        smoothed_df = pandas.DataFrame(self.smoothed_well_dict)
+        smoothed_df = self.smoothed_well_df
+        sorted_df = smoothed_df.sort()
+        mean_init_vals = sorted_df[2:5].mean()
+        corrected_df = smoothed_df - mean_init_vals
+        
         # Extra term is the Warringer correction
         # See PMID 21698134
-        corrected_df = np.log(smoothed_df + 0.8324*(smoothed_df**3))
+        corrected_df = np.log(corrected_df + 0.8324*(smoothed_df**3))
+        self._corrected_well_df = corrected_df
+        return corrected_df
     
-        """    
-        smoothed = self.smoothed_well_dict
-        for well_key, well_data in smoothed.iteritems():
-            corrected_well_data = []
-    
-            for timepoint, value in enumerate(well_data):
-                
-                corrected_value = np.log(value + 0.8324*(value**3)) 
-                corrected_well_data.append(corrected_value)
-            
-            corrected_well_dict[well_key] = corrected_well_data
-        """
-    
-        corrected_dict = dict((k, v.tolist()) for k,v in corrected_df.iteritems())
-        self._corrected_well_dict = corrected_dict
-        return corrected_well_dict
-    
-    def GetDoublingTimesAndLags(self, run_time, measurement_interval=30):
+    def GetDoublingTimes(self, run_time, measurement_interval=30):
         """Computes the doubling times and lags.
         
         Args:
@@ -147,21 +125,10 @@ class PlateTimeCourse(object):
         
         TODO(flamholz): rethink this interface.
         """
-        # Get initial values for each - a measurement prior to growth.
-        # This is like having a blank, but:
-        # 1) Assumes that the windowed average had a window size 3.
-        # 2) Assumes that all wells were below the detection limit
-        #    at the start of the experiment.
-        # TODO(flamholz): do something more robust for this.
-        all_init = []
-        corrected_smoothed = self.corrected_smoothed_well_dict
-        for well_key, well_data in corrected_smoothed.iteritems():
-            all_init.append(well_data[2])
-        mean_init = np.mean(all_init)
-
         # Maximum slope of the log-scale growth curve is specific growth rate.
-        # Note: corrected dictionary is log-transformed.
-        slopes_and_lags = {}
+        # Note: corrected dictionary is log-transformed already.
+        corrected_smoothed = self.corrected_log_smoothed_well_df
+        doubling_times = {}
         
         for well_key, well_data in corrected_smoothed.iteritems():
             all_slopes = []
@@ -188,20 +155,19 @@ class PlateTimeCourse(object):
             if lag_time > run_time or doubling_time == run_time:
                 lag_time = run_time
             
-            slopes_and_lags[well_key] = (doubling_time, lag_time)
-            
-        return slopes_and_lags
+            doubling_times[well_key] = doubling_time
+        
+        return doubling_times
 
     def PlotAll(self, label_mapping=None, measurement_interval=30):
         """Plots all the growth curves on the same figure."""
         my_label_mapping = label_mapping or {}
         fig = pylab.figure()
-        for well_key, well_data in self.smoothed_well_dict.iteritems():
+        for well_key, well_data in self.smoothed_well_df.iteritems():
             n_measurements = len(well_data)
             timepoints = np.arange(n_measurements) * measurement_interval
             well_label = my_label_mapping.get(well_key, well_key)
-            pylab.plot(timepoints, well_data, label=well_label, figure=fig,
-                       cmap=pylab.cm.cool)
+            pylab.plot(timepoints, well_data, label=well_label, figure=fig)
         
         pylab.xlabel('Time (Min)')
         pylab.ylabel('OD')
@@ -216,7 +182,7 @@ class PlateTimeCourse(object):
             measurement_interval: frequency of measurements, minutes.
         """
         inverse_mapping = label_mapping.InverseMapping()
-        doubling_times_and_lags = self.GetDoublingTimesAndLags(
+        doubling_times_and_lags = self.GetDoublingTimes(
             run_time, measurement_interval)
         
         labels = sorted(inverse_mapping.keys())
@@ -225,20 +191,20 @@ class PlateTimeCourse(object):
         for i, sample_label in enumerate(labels):
             cell_labels = inverse_mapping[sample_label]
             cell_doubling_times = [
-                doubling_times_and_lags[l][0] for l in cell_labels]
+                doubling_times_and_lags[l] for l in cell_labels]
             per_label_doubling_times.append(cell_doubling_times)
         
         pylab.boxplot(per_label_doubling_times, sym='gD')
         pylab.ylabel('Doubling Time (hours)')
         ticks = np.arange(len(labels))
         pylab.xticks(ticks, labels, rotation='35')
-        pylab.ylim(0, 8)
+        pylab.ylim(0, 4)
         
     
     def PlotByLabels(self, label_mapping, measurement_interval=30.0):
         """Plots growth curves with the same labels on the same figures."""
         inverse_mapping = label_mapping.InverseMapping()
-        smoothed_data = self.smoothed_well_dict
+        smoothed_data = self.smoothed_well_df
         
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
             fig = pylab.figure()
@@ -276,5 +242,5 @@ if __name__ == '__main__':
     print 'Filename', args.data_filename
     plate_data = PlateTimeCourse.FromFilename(args.data_filename)
     plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
-    #plate_data.PlotByLabels(well_labels)
+    plate_data.PlotByLabels(well_labels)
     pylab.show()
