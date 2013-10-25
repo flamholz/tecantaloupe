@@ -1,48 +1,11 @@
 #!/usr/bin/python
 
 from scipy import stats
-import csv
 import matplotlib.colors as colors
 import numpy as np
 import pandas
 import pylab
 
-
-class WellLabelMapping(dict):
-    
-    DEFAULT_ROWS_LABELS = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')
-    
-    @staticmethod
-    def NullMapping():
-        return WellLabelMapping()
-    
-    @staticmethod
-    def FromFile(f):
-        """Assumes f is a CSV file."""
-        mapping = {}
-        for i, row in enumerate(csv.reader(f)):
-            assert len(row) == 12, '%s != 12' % len(row)
-            assert i <= len(WellLabelMapping.DEFAULT_ROWS_LABELS)
-            
-            row_label = WellLabelMapping.DEFAULT_ROWS_LABELS[i]
-            for j, new_label in enumerate(row):
-                default_label = '%s%02d' % (row_label, j+1)
-                mapping[default_label] = new_label
-        
-        return WellLabelMapping(mapping)
-
-    @staticmethod
-    def FromFilename(filename):
-        with open(filename) as f:
-            return WellLabelMapping.FromFile(f)
-        
-    def InverseMapping(self):
-        """Maps new labels to defaults in a list."""
-        inverse_mapping = {}
-        for orig_label, descriptive_label in self.iteritems():
-            inverse_mapping.setdefault(descriptive_label, []).append(orig_label)
-        return inverse_mapping
-        
 
 class PlateTimeCourse(object):
     """Immutable plate data with convenience methods for computations."""
@@ -176,7 +139,8 @@ class PlateTimeCourse(object):
         """Plots all the growth curves on the same figure."""
         my_label_mapping = label_mapping or {}
         fig = pylab.figure()
-        data = np.exp(self.corrected_log_smoothed_well_df)
+        data = self.smoothed_well_df
+        #data = np.exp(self.corrected_log_smoothed_well_df)
         
         for well_key, well_data in data.iteritems():
             n_measurements = len(well_data)
@@ -285,7 +249,7 @@ class PlateTimeCourse(object):
                                       
     
     def PlotMeanGrowth(self, label_mapping, measurement_interval=30.0,
-                       label_delimiter='+'):
+                       label_delimiter='+', include_err=False, prefixes_to_include=None):
         """Plots growth curves with the same labels on the same figures."""
         inverse_mapping = label_mapping.InverseMapping()
 
@@ -300,19 +264,35 @@ class PlateTimeCourse(object):
         style_mapping = dict((s, linestyles[i%n_styles])
                              for i, s in enumerate(suffixes))
         
-        smoothed_data = np.exp(self.corrected_log_smoothed_well_df)
+        # Skip the first n measurements because they usually suck.
+        measurement_offset = 6
+        smoothed_data = self.smoothed_well_df[measurement_offset:]
+        sorted_df = smoothed_data.sort()
+        mean_init_vals = sorted_df[:5].mean()
+        smoothed_data = smoothed_data - mean_init_vals
+        
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
             sub_data = smoothed_data[orig_labels]
             mean = sub_data.mean(axis=1)
             stderr = sub_data.std(axis=1) / np.sqrt(len(orig_labels))
             n_measurements = len(mean)
             
-            suffix = descriptive_label.split(label_delimiter)[-1]
+            prefix, suffix = descriptive_label.split(label_delimiter)
+            if (prefixes_to_include is not None and
+                not prefix in prefixes_to_include):
+                continue
+            
             linestyle = style_mapping[suffix]
             
-            timepoints = np.arange(n_measurements) * measurement_interval / 60.0
-            pylab.errorbar(timepoints, mean,
-                           yerr=stderr, label=descriptive_label,
+            timepoints = ((np.arange(n_measurements) +
+                           measurement_offset) * measurement_interval / 60.0)
+            if include_err:
+                pylab.errorbar(timepoints, mean,
+                               yerr=stderr, label=descriptive_label,
+                               linestyle=linestyle, linewidth=2)
+            else:
+                pylab.plot(timepoints, mean,
+                           label=descriptive_label,
                            linestyle=linestyle, linewidth=2)
         
         pylab.legend(loc='upper left', prop={'size':'6'})
@@ -321,27 +301,27 @@ class PlateTimeCourse(object):
 
 
 from argparse import ArgumentParser
+from growth.plate_spec import PlateSpec
 import sys
 
 if __name__ == '__main__':
     
     parser = ArgumentParser(description='Little test script for plate data.')
-    parser.add_argument('-m', '--well_label_mapping', action='store',
+    parser.add_argument('-p', '--plate_spec_file', action='store',
                         required=False,
                         help='The file with well label names.')
     parser.add_argument('data_filename', metavar='data_filename',
                         help='Plate data')
     args = parser.parse_args()
     
-    well_labels = WellLabelMapping.NullMapping()
-    if args.well_label_mapping:
+    well_labels = PlateSpec.NullMapping()
+    if args.plate_spec_file:
         print 'Parsing well labels'
-        well_labels = WellLabelMapping.FromFilename(args.well_label_mapping)
+        well_labels = PlateSpec.FromFilename(args.plate_spec_file)
 
     print 'Filename', args.data_filename
     plate_data = PlateTimeCourse.FromFilename(args.data_filename)
-    #plate_data.PlotAll()
     #plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
-    #plate_data.PlotMeanGrowth(well_labels)
-    plate_data.PrintByMeanFinalDensity(well_labels)
+    plate_data.PlotMeanGrowth(well_labels, include_err=True, prefixes_to_include=['41a', '42a'])
+    #plate_data.PrintByMeanFinalDensity(well_labels)
     pylab.show()
