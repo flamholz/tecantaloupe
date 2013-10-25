@@ -13,8 +13,9 @@ class PlateTimeCourse(object):
     """Immutable plate data with convenience methods for computations."""
     
     def __init__(self, well_data_frame):
-        self._well_df = well_data_frame
+        self._well_df = well_data_frame  # Immutable
         self._smoothed_well_df = None
+        self._zeroed_well_df = None
         self._corrected_well_df = None
     
     @property
@@ -39,25 +40,34 @@ class PlateTimeCourse(object):
         return self._smoothed_well_df
     
     @property
+    def zeroed_smoothed_well_df(self):
+        if self._zeroed_well_df is not None:
+            return self._zeroed_well_df
+        
+        # Subtract off the mean of the 5 lowest recorded values
+        # for each time series.
+        corrected_df = self.smoothed_well_df.copy()
+        
+        # Note: we use np.sort because it handles NaN correctly
+        # while Pandas DataFrame.sort() does not seem to.
+        for key, values in corrected_df.iteritems():
+            sorted = np.sort(values)
+            corrected_df[key] -= np.mean(sorted[:5])
+                    
+        self._zeroed_well_df = corrected_df
+        return self._zeroed_well_df
+        
+    @property
     def corrected_log_smoothed_well_df(self):
         if self._corrected_well_df is not None:
             return self._corrected_well_df
-            
-        # Transforms the smoothened curve by
-        # 1) subtracting the initial value which corresponds to media.
-        # 2) log transforming and 3)  correcting for growth at high density 
-    
-        smoothed_df = self.smoothed_well_df
-        sorted_df = smoothed_df.sort()
-        mean_init_vals = sorted_df[2:5].mean()
-        corrected_df = smoothed_df - mean_init_vals
         
         # Extra term is the Warringer correction
         # See PMID 21698134
         #corrected_df = np.log(corrected_df + 0.8324*(corrected_df**3))
         # TODO(flamholz): think on this...
         
-        corrected_df = np.log(corrected_df)
+        corrected_df = np.log(self._zeroed_well_df)
         self._corrected_well_df = corrected_df
         return corrected_df
     
@@ -242,10 +252,7 @@ class PlateTimeCourse(object):
         
         # Skip the first n measurements because they usually suck.
         measurement_offset = 6
-        smoothed_data = self.smoothed_well_df[measurement_offset:]
-        sorted_df = smoothed_data.sort()
-        mean_init_vals = sorted_df[:5].mean()
-        smoothed_data = smoothed_data - mean_init_vals
+        smoothed_data = self.zeroed_smoothed_well_df[measurement_offset:]
         
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
             sub_data = smoothed_data[orig_labels]
