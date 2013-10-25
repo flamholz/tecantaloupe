@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+#!/usr/bin/python
+
 from scipy import stats
 import matplotlib.colors as colors
 import numpy as np
@@ -14,32 +16,6 @@ class PlateTimeCourse(object):
         self._well_df = well_data_frame
         self._smoothed_well_df = None
         self._corrected_well_df = None
-        
-    @staticmethod
-    def FromFile(f, measurement_interval=30.0):
-        well_dict = {}
-        for line in f:
-            if line.startswith('<>'):
-                continue  # Skip header lines.
-            
-            row_data = line.strip().split("\t")
-            row_label = row_data[0]
-            
-            # First entry in line is the row label.
-            for i, cell in enumerate(row_data[1:]):
-                cell_label = '%s%02d' % (row_label, i+1)
-                cell_data = float(cell)
-                well_dict.setdefault(cell_label, []).append(cell_data)
-        
-        n_measurements = len(well_dict.values()[0])
-        timepoints = np.arange(float(n_measurements)) * measurement_interval
-
-        return PlateTimeCourse(pandas.DataFrame(well_dict, index=timepoints))
-    
-    @staticmethod
-    def FromFilename(fname, measurement_interval=30.0):
-        with open(fname) as f:
-            return PlateTimeCourse.FromFile(f, measurement_interval)
     
     @property
     def smoothed_well_df(self):
@@ -302,11 +278,17 @@ class PlateTimeCourse(object):
 
 from argparse import ArgumentParser
 from growth.plate_spec import PlateSpec
+from growth.plate_time_course_parser import BremLabTecanParser
+
 import sys
+
 
 if __name__ == '__main__':
     
     parser = ArgumentParser(description='Little test script for plate data.')
+    parser.add_argument('-i', '--measurement_interval', action='store',
+                        required=False, default=30.0,
+                        help='Time between measurements (minutes).')
     parser.add_argument('-p', '--plate_spec_file', action='store',
                         required=False,
                         help='The file with well label names.')
@@ -320,7 +302,9 @@ if __name__ == '__main__':
         well_labels = PlateSpec.FromFilename(args.plate_spec_file)
 
     print 'Filename', args.data_filename
-    plate_data = PlateTimeCourse.FromFilename(args.data_filename)
+    parser = BremLabTecanParser(
+        measurement_interval=args.measurement_interval)
+    plate_data = parser.ParseFromFilename(args.data_filename)
     #plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
     plate_data.PlotMeanGrowth(well_labels, include_err=True, prefixes_to_include=['41a', '42a'])
     #plate_data.PrintByMeanFinalDensity(well_labels)
