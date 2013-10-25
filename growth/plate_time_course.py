@@ -3,6 +3,7 @@
 #!/usr/bin/python
 
 from scipy import stats
+from scipy import integrate
 import matplotlib.colors as colors
 import numpy as np
 import pandas
@@ -71,6 +72,23 @@ class PlateTimeCourse(object):
         self._corrected_well_df = corrected_df
         return corrected_df
     
+    def GetAreaUnderCurve(self):
+        """Calculates the area under the curve for each well.
+        
+        Smoothes and zeros the time series for each well first.
+        
+        Returns:
+            A dictionary mapping well label to areas.
+        """
+        aucs = {}
+        for well_key, series in self.zeroed_smoothed_well_df.iteritems():
+            finite = np.isfinite(series)
+            finite_indices = series.index.values[finite]
+            finite_values = series.values[finite]
+            auc = integrate.trapz(finite_values, x=finite_indices)
+            aucs[well_key] = auc
+        return aucs
+    
     def GetDoublingTimes(self, run_time,
                          measurement_interval=30,
                          min_reading=0.05):
@@ -120,6 +138,37 @@ class PlateTimeCourse(object):
             doubling_times[well_key] = best_dt
             
         return doubling_times
+
+    def PlotMeanAuc(self, label_mapping):
+        """Plots the mean AUC for each descriptive label in the mapping."""
+        aucs = self.GetAreaUnderCurve()
+        inverse_mapping = label_mapping.InverseMapping()
+        
+        fig = pylab.figure()
+        pylab.title('Per condition AUC', figure=fig)
+        
+        mean_aucs = []
+        std_errs = []
+        labels = []
+        for descriptive_label, orig_labels in inverse_mapping.iteritems():
+            orig_aucs = [aucs[l] for l in orig_labels]
+            mean_auc = np.mean(orig_aucs)
+            std_err = np.std(orig_aucs) / float(len(orig_labels))
+            
+            labels.append(descriptive_label)
+            mean_aucs.append(mean_auc)
+            std_errs.append(std_err)
+        
+        locs = np.arange(len(labels))
+        mean_aucs = np.array(mean_aucs)
+        std_errs = np.array(std_errs)
+        idxs = np.argsort(mean_aucs)
+        
+        pylab.bar(locs, mean_aucs[idxs],
+                  yerr=std_errs[idxs],linewidth=2,
+                  fill=False, figure=fig)
+        pylab.xticks(locs + 0.5, [labels[i] for i in idxs],
+                     rotation=45)
 
     def PlotAll(self, label_mapping=None, measurement_interval=30):
         """Plots all the growth curves on the same figure."""
