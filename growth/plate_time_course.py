@@ -29,7 +29,7 @@ class PlateTimeCourse(object):
         # Ensure monotonicity.
         for well_key, well_data in smoothed_df.iteritems():
             for i, value in enumerate(well_data):
-                if not i:
+                if i == 0:
                     continue
                 
                 if value < well_data[i-1]:
@@ -313,7 +313,6 @@ class PlateTimeCourse(object):
         # Skip the first n measurements because they usually suck.
         measurement_offset = 6
         smoothed_data = self.zeroed_smoothed_well_df[measurement_offset:]
-        
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
             sub_data = smoothed_data[orig_labels]
             mean = sub_data.mean(axis=1)

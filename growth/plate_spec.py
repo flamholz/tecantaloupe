@@ -20,14 +20,14 @@ class PlateSpec(dict):
             
             row_label = PlateSpec.DEFAULT_COL_LABELS[i]
             for j, new_label in enumerate(row):
-                default_label = '%s%02d' % (row_label, j+1)
+                default_label = '%s%d' % (row_label, j+1)
                 mapping[default_label] = new_label
         
         return PlateSpec(mapping)
 
     @staticmethod
     def FromFilename(filename):
-        with open(filename) as f:
+        with open(filename, 'U') as f:
             return PlateSpec.FromFile(f)
         
     def InverseMapping(self):
