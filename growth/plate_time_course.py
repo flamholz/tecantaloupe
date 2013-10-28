@@ -82,9 +82,10 @@ class PlateTimeCourse(object):
         """
         aucs = {}
         for well_key, series in self.zeroed_smoothed_well_df.iteritems():
-            finite = np.isfinite(series)
-            finite_indices = series.index.values[finite]
-            finite_values = series.values[finite]
+            series_data = series[10:]
+            finite = np.isfinite(series_data)
+            finite_indices = series_data.index.values[finite]
+            finite_values = series_data.values[finite]
             auc = integrate.trapz(finite_values, x=finite_indices)
             aucs[well_key] = auc
         return aucs
@@ -139,7 +140,10 @@ class PlateTimeCourse(object):
             
         return doubling_times
 
-    def PlotMeanAuc(self, label_mapping):
+    def PlotMeanAuc(self, label_mapping,
+                    label_delimiter='+',
+                    include_err=True,
+                    prefixes_to_include=None):
         """Plots the mean AUC for each descriptive label in the mapping."""
         aucs = self.GetAreaUnderCurve()
         inverse_mapping = label_mapping.InverseMapping()
@@ -151,6 +155,11 @@ class PlateTimeCourse(object):
         std_errs = []
         labels = []
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
+            prefix, suffix = descriptive_label.split(label_delimiter)
+            if (prefixes_to_include is not None and
+                prefix not in prefixes_to_include):
+                continue
+            
             orig_aucs = [aucs[l] for l in orig_labels]
             mean_auc = np.mean(orig_aucs)
             std_err = np.std(orig_aucs) / float(len(orig_labels))
@@ -164,8 +173,9 @@ class PlateTimeCourse(object):
         std_errs = np.array(std_errs)
         idxs = np.argsort(mean_aucs)
         
+        yerr = std_errs[idxs] if include_err else None
         pylab.bar(locs, mean_aucs[idxs],
-                  yerr=std_errs[idxs],linewidth=2,
+                  yerr=std_errs[idxs],
                   fill=False, figure=fig)
         pylab.xticks(locs + 0.5, [labels[i] for i in idxs],
                      rotation=45)
@@ -284,7 +294,8 @@ class PlateTimeCourse(object):
                                       
     
     def PlotMeanGrowth(self, label_mapping, measurement_interval=30.0,
-                       label_delimiter='+', include_err=False, prefixes_to_include=None):
+                       label_delimiter='+', include_err=False,
+                       prefixes_to_include=None):
         """Plots growth curves with the same labels on the same figures."""
         inverse_mapping = label_mapping.InverseMapping()
 
