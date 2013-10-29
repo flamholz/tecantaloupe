@@ -254,7 +254,7 @@ class PlateTimeCourse(object):
         
         linestyles = ['-', '--', '.-']
         n_styles = len(linestyles)
-        smoothed_data = self.smoothed_well_df
+        smoothed_data = self.zeroed_smoothed_well_df
         for figure_label, sub_mapping in extended_mapping.iteritems():
 
             fig = pylab.figure()
