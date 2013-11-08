@@ -40,8 +40,11 @@ if __name__ == '__main__':
             measurement_interval=args.measurement_interval)
         
     plate_data = parser.ParseFromFilename(args.data_filename)
-    #plate_data.PlotDoublingTimeByLabels(well_labels, run_time=23)
-    plate_data.PlotMeanGrowth(well_labels, include_err=True, prefixes_to_include=['41a', '42a'])
-    #plate_data.PlotMeanAuc(well_labels, include_err=True, prefixes_to_include=['41a', '42a'])
+    #plate_data.PlotByLabelPrefix(well_labels)
+    plate_data.PlotMeanGrowth(well_labels, include_err=True,
+                              prefixes_to_include=['41a', '42a'])
+    #plate_data.PlotMeanAuc(well_labels, include_err=True,
+    #                       prefixes_to_include=['BY4741a', 'BY4742a'])
     #plate_data.PrintByMeanFinalDensity(well_labels)
+    
     pylab.show()
