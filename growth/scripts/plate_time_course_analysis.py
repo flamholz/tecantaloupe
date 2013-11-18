@@ -42,8 +42,8 @@ if __name__ == '__main__':
     plate_data = parser.ParseFromFilename(args.data_filename)
     #plate_data.PlotByLabelPrefix(well_labels)
     plate_data.PlotMeanGrowth(well_labels, include_err=True,
-                              prefixes_to_include=['41a', '42a'])
-    #plate_data.PlotMeanAuc(well_labels, include_err=True,
+                              prefixes_to_include="Clib215 BY4741p BY4742a".split())
+    plate_data.PlotMeanAuc(well_labels, include_err=True)
     #                       prefixes_to_include=['BY4741a', 'BY4742a'])
     #plate_data.PrintByMeanFinalDensity(well_labels)
     
