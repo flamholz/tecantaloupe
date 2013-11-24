@@ -90,8 +90,7 @@ class PlateTimeCourse(object):
             aucs[well_key] = auc
         return aucs
     
-    def GetDoublingTimes(self, run_time,
-                         measurement_interval=30,
+    def GetDoublingTimes(self, measurement_interval=30,
                          min_reading=0.05):
         """Computes the doubling times and lags.
         
@@ -196,7 +195,7 @@ class PlateTimeCourse(object):
         pylab.xlabel('Time (Min)')
         pylab.ylabel('OD')
     
-    def PlotDoublingTimeByLabels(self, label_mapping, run_time,
+    def PlotDoublingTimeByLabels(self, label_mapping,
                                  measurement_interval=30.0):
         """Produces a boxplot of the per-label doubling times.
         
@@ -207,7 +206,7 @@ class PlateTimeCourse(object):
         """
         inverse_mapping = label_mapping.InverseMapping()
         doubling_times_and_lags = self.GetDoublingTimes(
-            run_time, measurement_interval)
+            measurement_interval)
         
         labels = sorted(inverse_mapping.keys())
         fig = pylab.figure()
@@ -280,7 +279,7 @@ class PlateTimeCourse(object):
     def PrintByMeanFinalDensity(self, label_mapping):
         inverse_mapping = label_mapping.InverseMapping()
         
-        smoothed_data = np.exp(self.corrected_log_smoothed_well_df)
+        smoothed_data = self.zeroed_smoothed_well_df
         mean_final_ods = []
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
             sub_data = smoothed_data[orig_labels]
@@ -291,7 +290,21 @@ class PlateTimeCourse(object):
                 
         for final_od, stderr, label in sorted(mean_final_ods, reverse=True):
             print '%s, %0.2g' % (label, final_od)
-                                      
+    
+                     
+    def PrintDoublingTimes(self, label_mapping, measurement_interval=30):
+    	inverse_mapping = label_mapping.InverseMapping()
+        doubling_times = self.GetDoublingTimes(measurement_interval)
+        
+        mean_dts = []
+        for descriptive_label, orig_labels in inverse_mapping.iteritems():
+            dts = [doubling_times[o] for o in orig_labels]
+            mean_dt = np.mean(dts)
+            std_err_dt = np.std(dts) / np.sqrt(len(orig_labels))
+            mean_dts.append((mean_dt, std_err_dt, descriptive_label))
+        
+        for dt, err, label in sorted(mean_dts, reverse=False):
+            print '%s, %0.2g +/- %0.2g' % (label, dt, err)
     
     def PlotMeanGrowth(self, label_mapping, measurement_interval=30.0,
                        label_delimiter='+', include_err=False,

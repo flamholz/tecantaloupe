@@ -57,6 +57,7 @@ class BremLabTecanParser(PlateTimeCourseParser):
             # First entry in line is the row label.
             for i, cell in enumerate(row_data[1:]):
                 cell_label = '%s%d' % (row_label, i+1)
+                cell = cell.strip() or '0'
                 cell_data = float(cell)
                 well_dict.setdefault(cell_label, []).append(cell_data)
         

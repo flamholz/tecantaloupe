@@ -38,13 +38,18 @@ if __name__ == '__main__':
         print 'Parsing as Tecan file'
         parser = BremLabTecanParser(
             measurement_interval=args.measurement_interval)
-        
+    
+    prefixes = "41a 42a".split()
     plate_data = parser.ParseFromFilename(args.data_filename)
-    #plate_data.PlotByLabelPrefix(well_labels)
+    
+    print 'Final culture density (zeroed and smoothed)'
+    plate_data.PrintByMeanFinalDensity(well_labels)
+    print 'Initial doubling times (smoothed)'
+    plate_data.PrintDoublingTimes(well_labels)
+
     plate_data.PlotMeanGrowth(well_labels, include_err=True,
-                              prefixes_to_include="Clib215 BY4741p BY4742a".split())
-    plate_data.PlotMeanAuc(well_labels, include_err=True)
-    #                       prefixes_to_include=['BY4741a', 'BY4742a'])
-    #plate_data.PrintByMeanFinalDensity(well_labels)
+                              prefixes_to_include=prefixes)
+    plate_data.PlotMeanAuc(well_labels, include_err=True,
+    					   prefixes_to_include=prefixes)
     
     pylab.show()
