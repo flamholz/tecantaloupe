@@ -20,7 +20,7 @@ if __name__ == '__main__':
                         help='Plate data')
     args = parser.parse_args()
 
-    ps = PlateSpec.NullMapping()
+    ps = PlateSpec.NullPlateSpec()
     if args.plate_spec_file:
         print 'Parsing well labels'
         ps = PlateSpec.FromFile(args.plate_spec_file)

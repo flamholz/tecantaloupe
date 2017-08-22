@@ -36,9 +36,9 @@ class PlateSpec(dict):
         return mapping
 
     @staticmethod
-    def NullMapping():
+    def NullPlateSpec():
         """
-        Returns an empty mappign in the right format for 96 well plates.
+        Returns an empty PlateSpec in the right format for 96 well plates.
         """
         rows = PlateSpec.ROWS
         cols = PlateSpec.COLS
@@ -48,8 +48,15 @@ class PlateSpec(dict):
 
         index = pd.MultiIndex.from_tuples(
             tuples, names=['value_type', 'column'])
-        empty_data = np.zeros((len(rows), len(cols)))
-        df = pd.DataFrame(empty_data, index=rows, columns=index)
+        well_names = []
+        for row in rows:
+            row_data = []
+            for col in cols:
+                s = '%s%s' % (row, col)
+                row_data.append(s)
+            well_names.append(row_data)
+
+        df = pd.DataFrame(well_names, index=rows, columns=index)
         return PlateSpec(df)
 
     @staticmethod
