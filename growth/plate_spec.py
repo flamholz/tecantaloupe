@@ -48,7 +48,7 @@ class PlateSpec(dict):
 
         index = pd.MultiIndex.from_tuples(
             tuples, names=['value_type', 'column'])
-        empty_data = np.zeros(len(rows), len(cols))
+        empty_data = np.zeros((len(rows), len(cols)))
         df = pd.DataFrame(empty_data, index=rows, columns=index)
         return PlateSpec(df)
 
