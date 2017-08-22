@@ -4,7 +4,7 @@ from scipy import stats
 from scipy import integrate
 import matplotlib.colors as colors
 import numpy as np
-import pandas
+import pandas as pd
 import pylab
 
 
@@ -21,7 +21,7 @@ class PlateTimeCourse(object):
         # Subtract off the mean of the 5 lowest recorded values
         # for each time series.
         corrected_df = self._well_df.copy()
-        
+
         for key, values in corrected_df.iteritems():
             vals_to_av = corrected_df[key].loc[n_skip:n_skip+n_av]
             corrected_df[key] -= np.mean(vals_to_av)
@@ -33,9 +33,19 @@ class PlateTimeCourse(object):
 
         smoothed = self._well_df
         for _ in xrange(rounds):
-            smoothed = pandas.rolling_mean(smoothed, window)
+            smoothed = pd.rolling_mean(smoothed, window)
 
         return PlateTimeCourse(smoothed)
+
+    def ratio_time_course(self, numerator, denominator):
+        num = self._well_df[numerator]
+        denom = self._well_df[denominator]
+        name = '%s/%s' % (numerator, denominator)
+        ratio_df = num / denom
+        full_df = pd.concat(
+            [ratio_df], axis=1, keys=[name],
+            names=['measurement_type', 'label'])
+        return PlateTimeCourse(full_df)
 
     def mean_by_name(self, plate_spec):
         """Aggregate cells by PlateSpec name, return means.
@@ -43,8 +53,18 @@ class PlateTimeCourse(object):
         Returns means as a DataFrame.
         """
         mapping = plate_spec.well_to_name_mapping()
-        g = self._well_df.groupby(mapping, axis=1)
-        return g.mean()
+        means = []
+        for label_name in self._well_df.columns.levels[0]:
+            grouped = self._well_df[label_name].groupby(mapping, axis=1)
+            group_means = grouped.mean()
+            means.append(group_means)
+
+        keys = self._well_df.columns.levels[0]
+        merged_df = pd.concat(
+            means, axis=1, keys=keys,
+            names=['measurement_type', 'label'])
+
+        return merged_df
 
     def sem_by_name(self, plate_spec):
         """Aggregate cells by PlateSpec name, return SEM.
@@ -52,8 +72,18 @@ class PlateTimeCourse(object):
         Returns standard error of the mean as a DataFrame.
         """
         mapping = plate_spec.well_to_name_mapping()
-        g = self._well_df.groupby(mapping, axis=1)
-        return g.sem()
+        sems = []
+        for label_name in self._well_df.columns.levels[0]:
+            grouped = self._well_df[label_name].groupby(mapping, axis=1)
+            group_sems = grouped.sem()
+            sems.append(group_sems)
+
+        keys = self._well_df.columns.levels[0]
+        merged_df = pd.concat(
+            sems, axis=1, keys=keys,
+            names=['measurement_type', 'label'])
+
+        return merged_df
     
     # methods below are probably broken. keeping code for notes
 
