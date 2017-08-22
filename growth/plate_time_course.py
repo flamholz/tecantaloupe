@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-#!/usr/bin/python
-
 from scipy import stats
 from scipy import integrate
 import matplotlib.colors as colors
@@ -12,84 +10,53 @@ import pylab
 
 class PlateTimeCourse(object):
     """Immutable plate data with convenience methods for computations."""
-    
-    def __init__(self, well_data_frame):
-        self._well_df = well_data_frame  # Immutable
-        self._smoothed_well_df = None
-        self._zeroed_well_df = None
-        self._corrected_well_df = None
-    
-    @property
-    def smoothed_well_df(self):
-        if self._smoothed_well_df is not None:
-            return self._smoothed_well_df
-        
-        smoothed_df = pandas.rolling_mean(self._well_df, 3)
-        
-        # Ensure monotonicity.
-        for well_key, well_data in smoothed_df.iteritems():
-            for i, value in enumerate(well_data):
-                if i == 0:
-                    continue
-                
-                if value < well_data[i-1]:
-                    well_data[i] = well_data[i-1]
-        
-        
-        # Second round of smoothing.
-        self._smoothed_well_df = pandas.rolling_mean(smoothed_df, 3)
-        return self._smoothed_well_df
-    
-    @property
-    def zeroed_smoothed_well_df(self):
-        if self._zeroed_well_df is not None:
-            return self._zeroed_well_df
-        
+
+    def __init__(self, well_df):
+        self._well_df = well_df  # Immutable
+
+    def blank(self, n_skip=3, n_av=5):
+        """Return a new timecourse that has been blanked.
+
+        """
         # Subtract off the mean of the 5 lowest recorded values
         # for each time series.
-        corrected_df = self.smoothed_well_df.copy()
+        corrected_df = self._well_df.copy()
         
-        # Note: we use np.sort because it handles NaN correctly
-        # while Pandas DataFrame.sort() does not seem to.
         for key, values in corrected_df.iteritems():
-            sorted = np.sort(values)
-            corrected_df[key] -= np.mean(sorted[:5])
-                    
-        self._zeroed_well_df = corrected_df
-        return self._zeroed_well_df
-        
-    @property
-    def corrected_log_smoothed_well_df(self):
-        if self._corrected_well_df is not None:
-            return self._corrected_well_df
-        
-        # Extra term is the Warringer correction
-        # See PMID 21698134
-        #corrected_df = np.log(corrected_df + 0.8324*(corrected_df**3))
-        # TODO(flamholz): think on this...
-        
-        corrected_df = np.log(self._zeroed_well_df)
-        self._corrected_well_df = corrected_df
-        return corrected_df
-    
-    def GetAreaUnderCurve(self):
-        """Calculates the area under the curve for each well.
-        
-        Smoothes and zeros the time series for each well first.
-        
-        Returns:
-            A dictionary mapping well label to areas.
+            vals_to_av = corrected_df[key].loc[n_skip:n_skip+n_av]
+            corrected_df[key] -= np.mean(vals_to_av)
+
+        return PlateTimeCourse(corrected_df)
+
+    def smooth(self, window=3, rounds=2):
+        assert rounds > 0
+
+        smoothed = self._well_df
+        for _ in xrange(rounds):
+            smoothed = pandas.rolling_mean(smoothed, window)
+
+        return PlateTimeCourse(smoothed)
+
+    def mean_by_name(self, plate_spec):
+        """Aggregate cells by PlateSpec name, return means.
+
+        Returns means as a DataFrame.
         """
-        aucs = {}
-        for well_key, series in self.zeroed_smoothed_well_df.iteritems():
-            series_data = series[10:]
-            finite = np.isfinite(series_data)
-            finite_indices = series_data.index.values[finite]
-            finite_values = series_data.values[finite]
-            auc = integrate.trapz(finite_values, x=finite_indices)
-            aucs[well_key] = auc
-        return aucs
+        mapping = plate_spec.well_to_name_mapping()
+        g = self._well_df.groupby(mapping, axis=1)
+        return g.mean()
+
+    def sem_by_name(self, plate_spec):
+        """Aggregate cells by PlateSpec name, return SEM.
+
+        Returns standard error of the mean as a DataFrame.
+        """
+        mapping = plate_spec.well_to_name_mapping()
+        g = self._well_df.groupby(mapping, axis=1)
+        return g.sem()
     
+    # methods below are probably broken. keeping code for notes
+
     def GetDoublingTimes(self, measurement_interval=30,
                          min_reading=0.05):
         """Computes the doubling times and lags.
@@ -154,7 +121,8 @@ class PlateTimeCourse(object):
         std_errs = []
         labels = []
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
-            prefix, suffix = descriptive_label.split(label_delimiter)
+            split_vals = descriptive_label.split(label_delimiter)
+            prefix = split_vals[0]
             if (prefixes_to_include is not None and
                 prefix not in prefixes_to_include):
                 continue
@@ -282,11 +250,14 @@ class PlateTimeCourse(object):
         smoothed_data = self.zeroed_smoothed_well_df
         mean_final_ods = []
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
-            sub_data = smoothed_data[orig_labels]
-            mean = sub_data.mean(axis=1)
-            std = sub_data.std(axis=1) / np.sqrt(len(orig_labels))
+            try:
+                sub_data = smoothed_data[orig_labels]
+                mean = sub_data.mean(axis=1)
+                std = sub_data.std(axis=1) / np.sqrt(len(orig_labels))
             
-            mean_final_ods.append((mean[-1], std[-1], descriptive_label))
+                mean_final_ods.append((mean[-1], std[-1], descriptive_label))
+            except:
+                continue
                 
         for final_od, stderr, label in sorted(mean_final_ods, reverse=True):
             print '%s, %0.2g' % (label, final_od)
@@ -298,10 +269,13 @@ class PlateTimeCourse(object):
         
         mean_dts = []
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
-            dts = [doubling_times[o] for o in orig_labels]
-            mean_dt = np.mean(dts)
-            std_err_dt = np.std(dts) / np.sqrt(len(orig_labels))
-            mean_dts.append((mean_dt, std_err_dt, descriptive_label))
+            try:
+                dts = [doubling_times[o] for o in orig_labels]
+                mean_dt = np.mean(dts)
+                std_err_dt = np.std(dts) / np.sqrt(len(orig_labels))
+                mean_dts.append((mean_dt, std_err_dt, descriptive_label))
+            except:
+                continue
         
         for dt, err, label in sorted(mean_dts, reverse=False):
             print '%s, %0.2g +/- %0.2g' % (label, dt, err)
@@ -327,17 +301,21 @@ class PlateTimeCourse(object):
         measurement_offset = 6
         smoothed_data = self.zeroed_smoothed_well_df[measurement_offset:]
         for descriptive_label, orig_labels in inverse_mapping.iteritems():
-            sub_data = smoothed_data[orig_labels]
-            mean = sub_data.mean(axis=1)
-            stderr = sub_data.std(axis=1) / np.sqrt(len(orig_labels))
-            n_measurements = len(mean)
-            
-            prefix, suffix = descriptive_label.split(label_delimiter)
+            try:
+                sub_data = smoothed_data[orig_labels]
+                mean = sub_data.mean(axis=1)
+                stderr = sub_data.std(axis=1) / np.sqrt(len(orig_labels))
+                n_measurements = len(mean)
+            except:
+                continue 
+                
+            split_vals = descriptive_label.split(label_delimiter)
+            prefix = split_vals[0]
             if (prefixes_to_include is not None and
                 not prefix in prefixes_to_include):
                 continue
             
-            linestyle = style_mapping[suffix]
+            linestyle = style_mapping[split_vals[-1]]
             
             timepoints = ((np.arange(n_measurements) +
                            measurement_offset) * measurement_interval / 60.0)
@@ -350,5 +328,6 @@ class PlateTimeCourse(object):
                            label=descriptive_label,
                            linestyle=linestyle, linewidth=2)
         
+        pylab.axvspan(72/2, 80/2, facecolor='m', alpha=0.5)
         pylab.legend(loc='upper left', prop={'size':'6'})
 

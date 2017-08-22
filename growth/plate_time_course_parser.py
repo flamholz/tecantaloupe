@@ -2,6 +2,9 @@
 
 from growth.plate_time_course import PlateTimeCourse
 
+import numpy as np
+import pandas as pd
+
 
 class PlateTimeCourseParser(object):
     
@@ -32,94 +35,34 @@ class PlateTimeCourseParser(object):
         """
         with open(fname, 'U') as f:
             return self.ParseFromFile(f)
-        
+ 
 
-import numpy as np
-import pandas
+class SavageLabM1000Excel(PlateTimeCourseParser):
 
-
-class BremLabTecanParser(PlateTimeCourseParser):
-    """Parses data from the BremLab Tecan Infinite reader."""
-    
-    def __init__(self, measurement_interval=30.0):
-        self._measurement_interval = measurement_interval
-    
-    def ParseFromFile(self, f):
+    def ParseFromFilename(self, f):
         """Concrete implementation."""
-        well_dict = {}
-        for line in f:
-            if line.startswith('<>'):
-                continue  # Skip header lines.
-            
-            row_data = line.strip().split("\t")
-            row_label = row_data[0]
-            
-            # First entry in line is the row label.
-            for i, cell in enumerate(row_data[1:]):
-                cell_label = '%s%d' % (row_label, i+1)
-                cell = cell.strip() or '0'
-                cell_data = float(cell)
-                well_dict.setdefault(cell_label, []).append(cell_data)
-        
-        n_measurements = len(well_dict.values()[0])
-        timepoints = np.arange(float(n_measurements)) * self._measurement_interval
-        data_frame = pandas.DataFrame(well_dict, index=timepoints)
+        df = pd.read_excel(f)
 
-        return PlateTimeCourse(data_frame)
-    
+        # this excel format puts a big header with metadata at the top.
+        # we want to parse without manually futzing with the file.
+        # find the start of the data
+        first_col = df.columns[0]
+        header_row_idx = df[df[first_col] == 'Cycle Nr.'].index[0]
 
-class RineLabSpectramaxParser(PlateTimeCourseParser):
-    """Parses data from the Rine Lab Spectramax."""
-        
-    def __init__(self, measurement_interval=30.0):
-        self._measurement_interval = measurement_interval
-    
-    def _ParseTimestampMinutes(self, tstring):
-        split_time = tstring.split(':')
-        hours, minutes, seconds = 0, 0, 0
-        if len(split_time) == 2:
-            minutes, seconds = int(split_time[0]), int(split_time[1])
-        elif len(split_time) == 3:
-            hours, minutes = int(split_time[0]), int(split_time[1])
-            seconds = int(split_time[2])
-        else:
-            assert False, 'Unrecognized timestamp format %s' % tstring
-        
-        return float(60 * hours + minutes)
-        
-    def ParseFromFile(self, f):
-        """Concrete implementation."""
-        well_dict = {}
-        well_names = None
-        timestamps = []
-        for line in f:
-            stripped = line.strip()
-            splitted = stripped.split('\t')
-            if (len(splitted) < 2 or
-                stripped.startswith('#')):
-                continue  # Skip comment and empty lines.
-            
-            if splitted[0].startswith('Plate:'):
-                continue # Skip plate metadata
-            
-            if splitted[2] == 'A1':
-                well_names = list(splitted[2:])
-                continue
-            
-            assert well_names, 'Well names not found.'
-            
-            # Parse the timestamp of the measurement
-            measurement_time = splitted[0]
-            minutes = self._ParseTimestampMinutes(measurement_time)
-            timestamps.append(minutes)
-            
-            # Parse the per-well measurements at this timestamp
-            for well_label, well_measurement in zip(well_names,
-                                                    splitted[2:]):
-                well_dict.setdefault(well_label, []).append(
-                    float(well_measurement))
-        
-        timestamps = np.array(timestamps)
-        data_frame = pandas.DataFrame(well_dict, index=timestamps)
-        return PlateTimeCourse(data_frame)
-    
+        # grab the header
+        colnames = df.loc[header_row_idx]
+        clipped_df = df.loc[header_row_idx+1:]
+
+        # set the column names to the right ones.
+        clipped_df.columns = colnames
+
+        # want to remove columns with no data
+        # first col is timestamp - will always have some data if parsed.
+        data_cols = clipped_df.columns[1:]
+        empty_cols = clipped_df[data_cols].isnull().all(axis=1)
+        last_index = clipped_df[empty_cols].index[0] - 1 
+        clipped_df = clipped_df.loc[:last_index]
+        clipped_df = clipped_df.set_index('Cycle Nr.')
+
+        return PlateTimeCourse(clipped_df)
+   
