@@ -63,6 +63,8 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         last_index = clipped_df[empty_cols].index[0] - 1 
         clipped_df = clipped_df.loc[:last_index]
         clipped_df = clipped_df.set_index('Cycle Nr.')
+        #clipped_df.columns[0] = 'time_s'
+        #clipped_df.columns[1] = 'temp_C'
 
         return PlateTimeCourse(clipped_df)
    
