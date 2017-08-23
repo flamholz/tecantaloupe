@@ -1,11 +1,11 @@
 #!/usr/bin/python
+# -*- coding: iso-8859-15 -*-
 
 from growth.plate_time_course import PlateTimeCourse
 
 import numpy as np
 import pandas as pd
 import re
-import xlrd
 
 
 class PlateTimeCourseParser(object):
@@ -65,8 +65,16 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         empty_cols = clipped_df[data_cols].isnull().all(axis=1)
         last_index = clipped_df[empty_cols].index[0] - 1
         clipped_df = clipped_df.loc[:last_index]
-        clipped_df = clipped_df.set_index('Cycle Nr.')
-        return clipped_df
+
+        rename_mapping = {'Time [s]': 'time_s',
+                          'Cycle Nr.': 'cycle_n',
+                          u'Temp. [\u00b0C]': 'temp_C'}
+        clipped_df.rename(columns=rename_mapping, inplace=True)
+        clipped_df = clipped_df.set_index('cycle_n')
+        
+        # Some versions of Pandas have a default type of Object
+        # for parsed files. We need to convert so we can do math.
+        return clipped_df.convert_objects(convert_numeric=True)
 
     def _splitFileToDataFrames(self, f):
         """Rather ad-hoc parsing of excel files using pandas..."""
@@ -105,7 +113,7 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
                     sub_df = df.loc[current_start:current_stop+1].copy()
                     sub_df = self._cleanParsedDataFrame(sub_df)
                     df_dict[current_label] = sub_df
-                    current_start = None # restart the count
+                    current_start = None  # restart the count
             
             if str_val.startswith('Cycle Nr.'):
                 current_start = row

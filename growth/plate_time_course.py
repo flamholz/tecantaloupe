@@ -14,34 +14,108 @@ class PlateTimeCourse(object):
     def __init__(self, well_df):
         self._well_df = well_df  # Immutable
 
+    @property
+    def well_df(self):
+        """Returns a DataFrame with data of this well."""
+        return self._well_df
+
+    def labels(self):
+        return self._well_df.columns.levels[0].tolist()
+
+    def _filter_columns(self, cols):
+        cs = [c for c in cols if c != 'temp_C']
+        return cs
+
+    def data_for_label(self, label):
+        """Returns data for this label.
+
+        Removes the cycle nr. and temp data since
+        they get in the way of plotting.
+        """
+        failure_msg = 'No such label "%s"' % label
+        assert label in self._well_df.columns, failure_msg
+        data = self._well_df[label]
+        data_cols = self._filter_columns(data.columns)
+        return data[data_cols]
+
     def blank(self, n_skip=3, n_av=5):
         """Return a new timecourse that has been blanked.
 
+        TODO: blanking based on separate blank wells should be possible.
+        Need to think about that, though, cuz you might have multiple blanks
+        with different media which could not be averaged.
+
+        Args:
+            n_skip: number of initial points to skip.
+            n_av: number of initial points to average on a per-well basis.
         """
         # Subtract off the mean of the 5 lowest recorded values
         # for each time series.
         corrected_df = self._well_df.copy()
+        index = corrected_df.index
+        pos_to_average = index[n_skip:n_skip+n_av]
 
         for key, values in corrected_df.iteritems():
-            vals_to_av = corrected_df[key].loc[n_skip:n_skip+n_av]
-            corrected_df[key] -= np.mean(vals_to_av)
+            colname = key[1]
+            if colname in ('time_s', 'temp_C'):
+                # don't blank cycle numbers or temperatures.
+                continue
+
+            vals_to_av = corrected_df[key].loc[pos_to_average]
+            corrected_df[key] -= vals_to_av.mean()
 
         return PlateTimeCourse(corrected_df)
 
     def smooth(self, window=3, rounds=2):
+        """Smooth your data to average out blips.
+
+        TODO: this is also doing a rolling mean on the time
+        and temp. Should exclude these from the smoothing.
+
+        Args:
+            window: the number of measurements to include
+                in the rolling mean window.
+            rounds: the number of rounds of smoothing to do.
+
+        Returns:
+            A new PlateTimeCourse with the averaged data.
+        """
         assert rounds > 0
 
-        smoothed = self._well_df
+        smoothed = self._well_df.copy()
         for _ in xrange(rounds):
-            smoothed = pd.rolling_mean(smoothed, window)
+            for key, row in smoothed.iteritems():
+                colname = key[1]
+                if colname in ('time_s', 'temp_C'):
+                    # don't smooth cycle numbers or temperatures.
+                    continue
+
+                smoothed[key] = pd.rolling_mean(row, window)
 
         return PlateTimeCourse(smoothed)
 
     def ratio_time_course(self, numerator, denominator):
-        num = self._well_df[numerator]
-        denom = self._well_df[denominator]
+        """Returns a time course of the ratio of two measurements.
+
+        Args:
+            numerator: string label of the numerator of the ratio.
+            denominator: string label of the denominator of the ratio.
+
+        Returns:
+            A new PlateTimeCourse with a measureming called
+                "numerator/denominator."
+        """
+        num = self.data_for_label(numerator)
+        denom = self.data_for_label(denominator)
+
+        num_data = num.drop('time_s', axis=1)
+        denom_data = denom.drop('time_s', axis=1)
+
         name = '%s/%s' % (numerator, denominator)
-        ratio_df = num / denom
+        ratio_df = num_data / denom_data
+
+        # numerator is the time standard.
+        ratio_df['time_s'] = num['time_s']
         full_df = pd.concat(
             [ratio_df], axis=1, keys=[name],
             names=['measurement_type', 'label'])
@@ -51,12 +125,18 @@ class PlateTimeCourse(object):
         """Aggregate cells by PlateSpec name, return means.
 
         Returns means as a DataFrame.
+
+        This should probably return a PlateTimeCourse object?
         """
         mapping = plate_spec.well_to_name_mapping()
         means = []
-        for label_name in self._well_df.columns.levels[0]:
-            grouped = self._well_df[label_name].groupby(mapping, axis=1)
+
+        labels = self.labels()
+        for label_name in labels:
+            label_df = self._well_df[label_name]
+            grouped = label_df.groupby(mapping, axis=1)
             group_means = grouped.mean()
+            group_means['time_s'] = label_df['time_s']
             means.append(group_means)
 
         keys = self._well_df.columns.levels[0]
@@ -64,18 +144,24 @@ class PlateTimeCourse(object):
             means, axis=1, keys=keys,
             names=['measurement_type', 'label'])
 
-        return merged_df
+        return PlateTimeCourse(merged_df)
 
     def sem_by_name(self, plate_spec):
         """Aggregate cells by PlateSpec name, return SEM.
 
         Returns standard error of the mean as a DataFrame.
+
+        This should probably return a PlateTimeCourse object?
         """
         mapping = plate_spec.well_to_name_mapping()
         sems = []
-        for label_name in self._well_df.columns.levels[0]:
-            grouped = self._well_df[label_name].groupby(mapping, axis=1)
+
+        labels = self.labels()
+        for label_name in labels:
+            label_df = self._well_df[label_name]
+            grouped = label_df.groupby(mapping, axis=1)
             group_sems = grouped.sem()
+            group_sems['time_s'] = label_df['time_s']
             sems.append(group_sems)
 
         keys = self._well_df.columns.levels[0]
@@ -83,7 +169,7 @@ class PlateTimeCourse(object):
             sems, axis=1, keys=keys,
             names=['measurement_type', 'label'])
 
-        return merged_df
+        return PlateTimeCourse(merged_df)
     
     # methods below are probably broken. keeping code for notes
 

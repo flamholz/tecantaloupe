@@ -69,4 +69,3 @@ class PlateSpec(dict):
         """
         df = pd.read_csv(f, header=[0, 1], index_col=[0])
         return PlateSpec(df)
-        mapping = {}
