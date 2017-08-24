@@ -16,9 +16,9 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--plate_spec_file', action='store',
                         required=False,
                         help='The file with well label names.')
-    parser.add_argument('-m', '--measurement_type', action='store',
+    parser.add_argument('-m', '--measurement_label', action='store',
                         required=False,
-                        help='The measurement type to plot.')
+                        help='The measurement label to plot.')
     parser.add_argument('data_filename', metavar='data_filename',
                         help='Plate data')
     args = parser.parse_args()
@@ -39,13 +39,19 @@ if __name__ == '__main__':
     sems = smoothed.sem_by_name(ps)
 
     seaborn.set_style('white')
-    if args.measurement_type:
-        mtype = args.measurement_type
-        print 'Plotting', mtype, 'only'
-        means[mtype].plot(
-            yerr=sems[mtype], figsize=(20, 10),
-            title=mtype)
-    else:
-        means.plot(
-            yerr=sems, figsize=(20, 10))
+    label = args.measurement_label
+    if not label:
+        label = means.labels()[0]
+
+    label_means = means.data_for_label(label)
+    label_sems = sems.data_for_label(label)
+
+    print 'Plotting', label, 'only'
+    # we use the cycle number to join multiple measurements since the time
+    # values may not match. but at the end of the day we want to plot against
+    # time.
+    label_means.plot(
+        x='time_s', yerr=label_sems,
+        figsize=(20, 10), title=label)
+
     plt.show()
