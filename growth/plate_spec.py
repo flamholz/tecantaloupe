@@ -35,6 +35,17 @@ class PlateSpec(dict):
             mapping[s] = n
         return mapping
 
+    def name_to_well_mapping(self):
+        """Returns a mapping from name -> cells."""
+        rows = PlateSpec.ROWS
+        cols = PlateSpec.COLS
+        mapping = dict()
+        for row, col in itertools.product(rows, cols):
+            s = '%s%s' % (row, col)
+            n = self.df.name[col][row]
+            mapping.setdefault(n, []).append(s)
+        return mapping
+
     @staticmethod
     def NullPlateSpec():
         """

@@ -45,7 +45,9 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
     SINGLE_LABEL_PATTERN = re.compile('Label: (.+)')
 
     def _cleanParsedDataFrame(self, df):
-        """."""
+        """
+        TODO: handle data with temp/CO2 info in it from Spark?
+        """
         # this excel format puts a big header with metadata at the top.
         # we want to parse without manually futzing with the file.
         # find the start of the data
@@ -138,4 +140,31 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
             ordered_dfs, axis=1, keys=keys,
             names=['measurement_type', 'well'])
         return PlateTimeCourse(merged_df)
-   
+
+
+class CoatesLabSunriseExcel(PlateTimeCourseParser):
+    """Assumes you exported wells along the columns with a timestamp.
+
+    Can only measure absorbance.
+    """
+    COLS = map(str, np.arange(1, 13))
+    ROWS = 'A,B,C,D,E,F,G,H'.split(',')
+    LABEL = 'OD600'
+
+    def ParseFromFilename(self, f):
+        """Concrete implementation."""
+        wells = ['%s%s' % (r, c) for c in self.COLS
+                 for r in self.ROWS]
+        h = ['time_s'] + wells
+        df = pd.read_excel(f, names=h)
+        last_id = df.index[-1]
+        df.drop(axis=0, labels=last_id, inplace=True)
+
+        time_s = [int(t.strip('s')) for t in df.time_s.values]
+        df.time_s = time_s
+
+        merged_df = pd.concat(
+            [df], axis=1, keys=[self.LABEL],
+            names=['measurement_type', 'well'])
+
+        return PlateTimeCourse(merged_df)

@@ -16,7 +16,10 @@ class PlateTimeCourse(object):
 
     @property
     def well_df(self):
-        """Returns a DataFrame with data of this well."""
+        """Returns a DataFrame with data of this well.
+
+        TODO: document well_df format.
+        """
         return self._well_df
 
     def labels(self):
@@ -25,6 +28,45 @@ class PlateTimeCourse(object):
     def _filter_columns(self, cols):
         cs = [c for c in cols if c != 'temp_C']
         return cs
+
+    def data_for_plate_wells(self, wells):
+        """Grab data only for these wells.
+
+        Returns:
+            A new PlateTimeCourse object.
+        """
+        sorted = self._well_df.sort_index(axis=1)
+        
+        # keep time column always
+        selector = wells + ['time_s']
+        sub_df = self._well_df.loc[:, (slice(None), selector)]
+        return PlateTimeCourse(sub_df)
+
+    def data_for_plate_rows(self, rows):
+        """Grab only data for these plate rows.
+
+        As opposed to DataFrame rows.
+
+        Returns:
+            A new PlateTimeCourse object.
+        """
+        wells = ['%s%s' % (r, c) for r in rows
+                 for c in np.arange(1, 13)]
+        # keep time column always
+        return self.data_for_plate_wells(wells)
+
+    def data_for_plate_cols(self, cols):
+        """Grab only data for these plate columns.
+
+        As opposed to DataFrame columns.
+
+        Returns:
+            A new PlateTimeCourse object.
+        """
+        wells = ['%s%s' % (r, c) for r in 'ABCDEFGH'
+                 for c in cols]
+        # keep time column always
+        return self.data_for_plate_wells(wells)
 
     def data_for_label(self, label):
         """Returns data for this label.
