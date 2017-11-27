@@ -11,7 +11,7 @@ from growth.plate_time_course_parser import SavageLabM1000Excel
 
 
 class IntegrationTest(unittest.TestCase):
-    
+
     def testSimpleParse(self):
         # parsing a dataset with one measurement.
         ps = PlateSpec.FromFile('growth/plate_specs/example_plate_spec.csv')
@@ -61,6 +61,38 @@ class IntegrationTest(unittest.TestCase):
         ratio_data = GFP_per_OD.data_for_label('GFP/abs600')
         self.assertEquals(33, ratio_data.columns.size)
 
+    def testMaxGrowthRates(self):
+        # parsing a dataset with one measurement.
+        ps = PlateSpec.FromFile(
+            'growth/plate_specs/example_plate_spec_multimeasurement.csv')
+
+        parser = SavageLabM1000Excel()
+        timecourse = parser.ParseFromFilename(
+            'growth/data/example_data_multimeasurement.xlsx')
+
+        blanked = timecourse.blank()
+        smoothed = timecourse.smooth()
+
+        grs = smoothed.GrowthRates(density_label='abs600')
+        grs = smoothed.MaxGrowthRates(density_label='abs600')
+        for v in grs.itervalues():
+            self.assertTrue(np.isfinite(v))
+
+    def testGrowthYield(self):
+        # parsing a dataset with one measurement.
+        ps = PlateSpec.FromFile(
+            'growth/plate_specs/example_plate_spec_multimeasurement.csv')
+
+        parser = SavageLabM1000Excel()
+        timecourse = parser.ParseFromFilename(
+            'growth/data/example_data_multimeasurement.xlsx')
+
+        blanked = timecourse.blank()
+        smoothed = timecourse.smooth()
+
+        yields = smoothed.GrowthYield(density_label='abs600')
+        for v in yields.itervalues():
+            self.assertTrue(np.isfinite(v))
+
 if __name__ == '__main__':
     unittest.main()
-        
