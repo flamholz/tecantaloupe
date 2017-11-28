@@ -90,6 +90,10 @@ class IntegrationTest(unittest.TestCase):
         blanked = timecourse.blank()
         smoothed = timecourse.smooth()
 
+        lags = smoothed.LagTime(density_label='abs600')
+        for v in lags.itervalues():
+            self.assertTrue(np.isfinite(v))
+            
         yields = smoothed.GrowthYield(density_label='abs600')
         for v in yields.itervalues():
             self.assertTrue(np.isfinite(v))

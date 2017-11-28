@@ -234,6 +234,37 @@ class PlateTimeCourse(object):
                        for col in cols_to_use)
         return yields
 
+    def LagTime(self, density_label='OD600', min_reading=0.1):
+        """Returns the lag time in hrs.
+
+        Lag time is here defined as the time at which the culture
+        becomes measurable, i.e. crosses the min_reading threshold.
+
+        Returns:
+            A dictionary mapping column to lag time in hrs.
+        """
+        OD_data = self.data_for_label(density_label)
+        cols = set(OD_data)
+        cols_to_use = cols.difference(self.SPECIAL_COLS)
+        cols_to_use = list(cols_to_use)
+        time_h = OD_data[self.TIME_COL] / (60.0*60.0)
+
+        # pick timepoint with min abs difference from min_reading
+        thresholded = np.abs(OD_data[cols_to_use] - min_reading)
+        min_idxs = thresholded.idxmin()
+
+        lags = {}
+        for k, idx in min_idxs.iteritems():
+            t = time_h[idx]
+            lags[k] = t
+
+        max_od = OD_data[cols_to_use].max()
+        for k, max_od in max_od.iteritems():
+            if max_od < min_reading:
+                lags[k] = np.NAN
+
+        return lags
+
     def GrowthRates(self, density_label='OD600'):
         """Computes the exponential growth rate in gens/hr.
 
@@ -241,6 +272,8 @@ class PlateTimeCourse(object):
 
         Definitely best to smooth before applying this logic since it
         assumes that derivative(ln(OD)) is smooth.
+
+        TODO: integrate with below? 
 
         Returns:
             DataFrame of growth rate over time.
