@@ -84,12 +84,43 @@ class PlateTimeCourse(object):
         data_cols = self._filter_columns(data.columns)
         return data[data_cols]
 
-    def blank(self, n_skip=3, n_av=5):
+    def _blank_by_blank_wells(self, blank_wells, n_skip=3, n_av=5):
         """Return a new timecourse that has been blanked.
 
         TODO: blanking based on separate blank wells should be possible.
         Need to think about that, though, cuz you might have multiple blanks
         with different media which could not be averaged.
+
+        Args:
+            n_skip: number of initial points to skip.
+            n_av: number of initial points to average on a per-well basis.
+        """
+        wdf = self._well_df
+        index = wdf.index
+        pos_to_average = index[n_skip:n_skip+n_av]
+
+        cols = set(wdf.columns)
+        cols_to_use = cols.difference(self.SPECIAL_COLS)
+        cols_to_use = list(cols_to_use)
+
+        blank_vals = []
+
+        for key, values in wdf.iteritems():
+            colname = key[1]
+            if colname not in blank_wells:
+                # don't blank cycle numbers or temperatures.
+                continue
+
+            vals_to_av = wdf[key].loc[pos_to_average]
+            blank_vals.extend(vals_to_av.values)
+
+        blank_val = np.mean(blank_vals)
+        blanked_df = wdf.copy()
+        blanked_df[cols_to_use] -= blank_val
+        return PlateTimeCourse(blanked_df)
+
+    def _blank_by_early_timepoints(self, n_skip=3, n_av=5):
+        """Return a new timecourse that has been blanked.
 
         Args:
             n_skip: number of initial points to skip.
@@ -111,6 +142,27 @@ class PlateTimeCourse(object):
             corrected_df[key] -= vals_to_av.mean()
 
         return PlateTimeCourse(corrected_df)
+
+    def blank(self, blank_wells=None, n_skip=3, n_av=5):
+        """Return a new timecourse that has been blanked.
+
+        If blank_wells is defined, all wells will be blanked
+        according to the mean measurements of n_av early timepoints
+        from the defined blanks.
+
+        Otherwise, each well will be blanked separately by subtracting
+        off the mean of n_av early timepoints (skipping the first n_skip).
+
+        Args:
+            blank_wells: the column IDs of blank wells.
+            n_skip: number of initial points to skip.
+            n_av: number of initial points to average on a per-well basis.
+        """
+        if not blank_wells:
+            return self._blank_by_early_timepoints(
+                n_skip=n_skip, n_av=n_av)
+        return self._blank_by_blank_wells(
+            blank_wells, n_skip=n_skip, n_av=n_av)
 
     def smooth(self, window=3, rounds=2):
         """Smooth your data to average out blips.

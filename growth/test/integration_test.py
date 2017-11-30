@@ -20,7 +20,10 @@ class IntegrationTest(unittest.TestCase):
         timecourse = parser.ParseFromFilename(
             'growth/data/example_data.xlsx')
 
-        blanked = timecourse.blank()
+        # try both types of blanking
+        blanked = timecourse.blank(blank_wells=['H9', 'H10', 'H11'])
+        blanked = timecourse.blank()  # per well.
+
         smoothed = timecourse.smooth()
         smoothed_OD = smoothed.data_for_label('abs600')
         # 96 wells, time column
