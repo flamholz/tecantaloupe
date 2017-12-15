@@ -9,22 +9,22 @@ Python-based pipeline for parsing and manipulating output from plate readers. Fo
 * Parsing of Excel output from iContol.
 * Built-in blanking and data-smoothing. 
 * Aggregation of data by well labels for plotting and analysis.
-
-# Planned features 
-
 * Calculation of growth rates and yields for microbial growth curves. 
+* Compatible with python2.7+
 
 # Dependencies
 
 * numpy
+* scipy
 * pandas
-* matplotlib (for plotting scripts)
-* seaborn (for plotting scripts)
+* xlrd (reading Excel files)
+* matplotlib (for plotting)
+* seaborn (for plotting)
 
 You can install all dependencies using pip as follows
 
 ```bash
-$ pip install numpy pandas matplotlib seaborn
+$ pip install numpy pandas matplotlib seaborn scipy xlrd
 ```
 
 # Examples
