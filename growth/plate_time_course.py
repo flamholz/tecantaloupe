@@ -118,7 +118,7 @@ class PlateTimeCourse(object):
                 blank_vals.extend(vals_to_av.values)
 
             blank_val = np.mean(blank_vals)
-            blanked_df[dtype][cols_to_use] -= blank_val
+            blanked_df.loc[:, (dtype, cols_to_use)] -= blank_val
 
         return PlateTimeCourse(blanked_df)
 
