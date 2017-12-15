@@ -11,7 +11,7 @@ class PlateSpec(dict):
     TODO: make this generic for any plate size.
     """
     
-    COLS = map(str, np.arange(1, 13))
+    COLS = list(map(str, np.arange(1, 13)))
     ROWS = 'A,B,C,D,E,F,G,H'.split(',')
 
     def __init__(self, df):

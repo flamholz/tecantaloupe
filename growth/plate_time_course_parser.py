@@ -24,13 +24,14 @@ class PlateTimeCourseParser(object):
         """
         raise NotImplementedError()
 
-    def ParseFromFilename(self, fname):
+    def ParseFromFilename(self, fname, sheetname=0):
         """Convenience to parse from a filename.
         
         Opens the file, parses.
         
         Args:
             fname: the name/path to the file.
+            sheetname: the name of the
         
         Returns:
             A PlateTimeCourse object.
@@ -78,14 +79,13 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         # for parsed files. We need to convert so we can do math.
         return clipped_df.convert_objects(convert_numeric=True)
 
-    def _splitFileToDataFrames(self, f):
+    def _splitFileToDataFrames(self, f, sheetname=0):
         """Rather ad-hoc parsing of excel files using pandas..."""
         # first pass - count labels
         n_labels = 0
         single_label = None
 
-        df = pd.read_excel(f)
-
+        df = pd.read_excel(f, sheetname=sheetname)
         for row in df.index:
             l = str(df.loc[row][0])
             match = self.LABELS_PATTERN.search(l)
@@ -128,9 +128,9 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
 
         return df_dict
 
-    def ParseFromFilename(self, f):
+    def ParseFromFilename(self, f, sheetname=0):
         """Concrete implementation."""
-        dfs = self._splitFileToDataFrames(f)
+        dfs = self._splitFileToDataFrames(f, sheetname=sheetname)
         assert dfs
 
         keys = sorted(dfs.keys())
@@ -147,16 +147,16 @@ class CoatesLabSunriseExcel(PlateTimeCourseParser):
 
     Can only measure absorbance.
     """
-    COLS = map(str, np.arange(1, 13))
+    COLS = list(map(str, np.arange(1, 13)))
     ROWS = 'A,B,C,D,E,F,G,H'.split(',')
     LABEL = 'OD600'
 
-    def ParseFromFilename(self, f):
+    def ParseFromFilename(self, f, sheetname=0):
         """Concrete implementation."""
         wells = ['%s%s' % (r, c) for c in self.COLS
                  for r in self.ROWS]
         h = ['time_s'] + wells
-        df = pd.read_excel(f, names=h)
+        df = pd.read_excel(f, names=h, sheetname=sheetname)
         last_id = df.index[-1]
         df.drop(axis=0, labels=last_id, inplace=True)
 

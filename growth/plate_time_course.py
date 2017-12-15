@@ -99,24 +99,27 @@ class PlateTimeCourse(object):
         index = wdf.index
         pos_to_average = index[n_skip:n_skip+n_av]
 
-        cols = set(wdf.columns)
-        cols_to_use = cols.difference(self.SPECIAL_COLS)
-        cols_to_use = list(cols_to_use)
+        blanked_df = wdf.copy()  # modify a copy
 
-        blank_vals = []
+        for dtype in wdf.columns.levels[0]:
+            # blank each datatype separately
+            sub_df = wdf[dtype]
+            cols = set(sub_df.columns)
+            cols_to_use = cols.difference(self.SPECIAL_COLS)
+            cols_to_use = list(cols_to_use)
 
-        for key, values in wdf.iteritems():
-            colname = key[1]
-            if colname not in blank_wells:
-                # don't blank cycle numbers or temperatures.
-                continue
+            blank_vals = []
+            for colname in sub_df.columns:
+                if colname not in blank_wells:
+                    # don't blank cycle numbers or temperatures.
+                    continue
 
-            vals_to_av = wdf[key].loc[pos_to_average]
-            blank_vals.extend(vals_to_av.values)
+                vals_to_av = sub_df[colname].loc[pos_to_average]
+                blank_vals.extend(vals_to_av.values)
 
-        blank_val = np.mean(blank_vals)
-        blanked_df = wdf.copy()
-        blanked_df[cols_to_use] -= blank_val
+            blank_val = np.mean(blank_vals)
+            blanked_df[dtype][cols_to_use] -= blank_val
+
         return PlateTimeCourse(blanked_df)
 
     def _blank_by_early_timepoints(self, n_skip=3, n_av=5):
@@ -283,7 +286,7 @@ class PlateTimeCourse(object):
         cols_to_use = cols.difference(self.SPECIAL_COLS)
 
         yields = dict((col, np.nanmax(OD_data[col].values))
-                       for col in cols_to_use)
+                      for col in cols_to_use)
         return yields
 
     def LagTime(self, density_label='OD600', min_reading=0.1):
