@@ -78,7 +78,7 @@ class IntegrationTest(unittest.TestCase):
 
         grs = smoothed.GrowthRates(density_label='abs600')
         grs = smoothed.MaxGrowthRates(density_label='abs600')
-        for v in grs.itervalues():
+        for v in grs.values():
             self.assertTrue(np.isfinite(v))
 
     def testGrowthYield(self):
@@ -94,11 +94,11 @@ class IntegrationTest(unittest.TestCase):
         smoothed = timecourse.smooth()
 
         lags = smoothed.LagTime(density_label='abs600')
-        for v in lags.itervalues():
+        for v in lags.values():
             self.assertTrue(np.isfinite(v))
             
         yields = smoothed.GrowthYield(density_label='abs600')
-        for v in yields.itervalues():
+        for v in yields.values():
             self.assertTrue(np.isfinite(v))
 
 if __name__ == '__main__':

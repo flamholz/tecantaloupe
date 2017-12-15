@@ -184,7 +184,7 @@ class PlateTimeCourse(object):
         assert rounds > 0
 
         smoothed = self._well_df.copy()
-        for _ in xrange(rounds):
+        for _ in range(rounds):
             for key, row in smoothed.iteritems():
                 colname = key[1]
                 if colname in self.SPECIAL_COLS:
@@ -347,7 +347,7 @@ class PlateTimeCourse(object):
 
             # For each 4-measurement windows.
             # regress against time, keep regression slope.
-            for idx in xrange(len(well_data) - 3):
+            for idx in range(len(well_data) - 3):
                 local_data = well_data[idx:idx+4].values
                 timepoints = time_h[idx:idx+4].values
                 regressed = stats.linregress(timepoints, local_data)
@@ -388,7 +388,7 @@ class PlateTimeCourse(object):
             # 1) discard if minimum value beneath user-defined limit.
             # 2) regress against time.
             # 3) keep regression slope.
-            for idx in xrange(len(well_data) - 3):
+            for idx in range(len(well_data) - 3):
                 local_data = well_data[idx:idx+4].values
                 
                 if np.nanmin(local_data) < log_lb:
