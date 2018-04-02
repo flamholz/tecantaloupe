@@ -129,7 +129,10 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         return df_dict
 
     def ParseFromFilename(self, f, sheet_name=0):
-        """Concrete implementation."""
+        """Concrete implementation.
+
+        TODO: consistent keyword arg name for sheetname between us and pandas.
+        """
         dfs = self._splitFileToDataFrames(f, sheet_name=sheet_name)
         assert dfs
 

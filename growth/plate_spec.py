@@ -13,6 +13,8 @@ class PlateSpec(dict):
     
     COLS = list(map(str, np.arange(1, 13)))
     ROWS = 'A,B,C,D,E,F,G,H'.split(',')
+    ALL_WELLS = tuple(itertools.product(ROWS, COLS))
+    ALL_WELL_NAMES = tuple('%s%s' % (r, c) for r, c in ALL_WELLS)
 
     def __init__(self, df):
         """Initialize with a DataFrame describing the plate.
@@ -26,10 +28,8 @@ class PlateSpec(dict):
 
     def well_to_name_mapping(self):
         """Returns a mapping from cells -> name."""
-        rows = PlateSpec.ROWS
-        cols = PlateSpec.COLS
         mapping = dict()
-        for row, col in itertools.product(rows, cols):
+        for row, col in PlateSpec.ALL_WELLS:
             s = '%s%s' % (row, col)
             n = self.df.name[col][row]
             mapping[s] = n
@@ -37,10 +37,8 @@ class PlateSpec(dict):
 
     def name_to_well_mapping(self):
         """Returns a mapping from name -> cells."""
-        rows = PlateSpec.ROWS
-        cols = PlateSpec.COLS
         mapping = dict()
-        for row, col in itertools.product(rows, cols):
+        for row, col in PlateSpec.ALL_WELLS:
             s = '%s%s' % (row, col)
             n = self.df.name[col][row]
             mapping.setdefault(n, []).append(s)
@@ -55,7 +53,7 @@ class PlateSpec(dict):
         cols = PlateSpec.COLS
 
         arrays = [['name'], cols]
-        tuples = list(itertools.product(*arrays))
+        tuples = list(PlateSpec.ALL_WELLS)
 
         index = pd.MultiIndex.from_tuples(
             tuples, names=['value_type', 'column'])

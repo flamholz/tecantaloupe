@@ -167,6 +167,83 @@ class PlateTimeCourse(object):
         return self._blank_by_blank_wells(
             blank_wells, n_skip=n_skip, n_av=n_av)
 
+    def blank_by_label(self, label, blanks):
+        """Line up exp and blank at same OD and blank other channels.
+
+        Args:
+            label: channel name used to align curves.
+            blanks: column names associated with blanks.
+
+        Returns:
+            A new PlateTimeCourse with the averaged data.
+
+        Designed for blanking fluorescence curves against a -fluor control.
+        Basic idea:
+            1. For each negative control, map mean OD to a timepoint.
+            2. For eack exp, make a timecourse of (-) control fluorescence
+               at the same OD.
+            3. Subtract that signal off to make a blanked signal.
+
+        This code is not optimized for runtime.
+        Takes tens of seconds to run on typical data.
+        """
+        # Grab the measurement we are aligning by
+        data_for_alignment = self.data_for_label(label)
+        # The other labels are the ones we are blanking
+        all_labels = self.labels()
+        non_blank_labels = [
+            l for l in all_labels if l != label]
+
+        # The other columns are the ones we are blanking.
+        cols = data_for_alignment.columns
+        non_blank_cols = [
+            c for c in cols
+            if c not in blanks and not c.startswith(self.TIME_COL)]
+
+        means = data_for_alignment[blanks].mean(axis=1)
+        mean_blank_df = pd.DataFrame({
+            'time_s': data_for_alignment.time_s,
+            'mean_blank': means})
+
+        # Align signals by blank label.
+        well2blank_idxs = {}
+        for well in non_blank_cols:
+            idxs = []
+            for tp in data_for_alignment[well]:
+                if np.isnan(tp):
+                    # Use first index if the value is NaN
+                    # Need to do something here.
+                    idxs.append(0)
+                    continue
+                    
+                sorted_idxs = np.abs(mean_blank_df.mean_blank - tp).argsort()
+                # First N idxs will be -1 because the values are NaN
+                shift = np.sum(sorted_idxs < 0)
+                best_match = sorted_idxs[sorted_idxs > 0].iloc[0] + shift + 1
+                idxs.append(best_match)
+            
+            well2blank_idxs[well] = idxs
+
+        # Aggregate blank values for each well
+        blank_data = {}
+        for l in non_blank_labels:
+            ldata = self.data_for_label(l)
+            mean_blanks_for_l = ldata[blanks].mean(axis=1)
+
+            for well in non_blank_cols:
+                idxs = well2blank_idxs[well]
+                blank_data[(l, well)] = mean_blanks_for_l[idxs].values
+
+        blanks_df = pd.DataFrame(blank_data)
+        blanked_data_df = self._well_df.copy()
+        for l in non_blank_labels:
+            blanked = self._well_df[l].copy().subtract(blanks_df[l])
+            blanked[self.TIME_COL] = self._well_df[l][self.TIME_COL]
+            blanked[self.TEMP_COL] = self._well_df[l][self.TEMP_COL]
+            blanked_data_df[l] = blanked
+
+        return PlateTimeCourse(blanked_data_df)
+
     def smooth(self, window=3, rounds=2):
         """Smooth your data to average out blips.
 
@@ -226,8 +303,6 @@ class PlateTimeCourse(object):
         """Aggregate cells by PlateSpec name, return means.
 
         Returns means as a DataFrame.
-
-        This should probably return a PlateTimeCourse object?
         """
         mapping = plate_spec.well_to_name_mapping()
         means = []
@@ -243,6 +318,29 @@ class PlateTimeCourse(object):
         keys = self._well_df.columns.levels[0]
         merged_df = pd.concat(
             means, axis=1, keys=keys,
+            names=['measurement_type', 'label'])
+
+        return PlateTimeCourse(merged_df)
+
+    def std_by_name(self, plate_spec):
+        """Aggregate cells by PlateSpec name, return STD DEV.
+
+        Returns standard error of the mean as a DataFrame.
+        """
+        mapping = plate_spec.well_to_name_mapping()
+        stds = []
+
+        labels = self.labels()
+        for label_name in labels:
+            label_df = self._well_df[label_name]
+            grouped = label_df.groupby(mapping, axis=1)
+            group_stds = grouped.std()
+            group_stds[self.TIME_COL] = label_df[self.TIME_COL]
+            stds.append(group_stds)
+
+        keys = self._well_df.columns.levels[0]
+        merged_df = pd.concat(
+            stds, axis=1, keys=keys,
             names=['measurement_type', 'label'])
 
         return PlateTimeCourse(merged_df)
