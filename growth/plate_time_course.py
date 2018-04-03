@@ -167,12 +167,18 @@ class PlateTimeCourse(object):
         return self._blank_by_blank_wells(
             blank_wells, n_skip=n_skip, n_av=n_av)
 
-    def blank_by_label(self, label, blanks):
+    def blank_by_label(self, label, blanks,
+                       max_deviation=None,
+                       max_pct_deviation=None):
         """Line up exp and blank at same OD and blank other channels.
 
         Args:
             label: channel name used to align curves.
             blanks: column names associated with blanks.
+            max_deviation: maximum absolute deviation
+                allowed for blank and exp points to be associated.
+            max_pct_deviation: maximum relative deviation
+                allowed for blank and exp points to be associated.
 
         Returns:
             A new PlateTimeCourse with the averaged data.
@@ -215,8 +221,18 @@ class PlateTimeCourse(object):
                     # Need to do something here.
                     idxs.append(0)
                     continue
-                    
-                sorted_idxs = np.abs(mean_blank_df.mean_blank - tp).argsort()
+                
+                abs_diffs = np.abs(mean_blank_df.mean_blank - tp)
+                min_diff = np.nanmin(abs_diffs.values)
+                # Don't want to use blanks w/ very different values
+                if min_diff > (max_deviation or np.inf):
+                    idxs.append(np.NaN)
+                    continue
+                if (100.0*min_diff / tp) > (max_pct_deviation or np.inf):
+                    idxs.append(np.NaN)
+                    continue
+
+                sorted_idxs = abs_diffs.argsort()
                 # First N idxs will be -1 because the values are NaN
                 shift = np.sum(sorted_idxs < 0)
                 best_match = sorted_idxs[sorted_idxs > 0].iloc[0] + shift + 1
