@@ -284,7 +284,8 @@ class PlateTimeCourse(object):
                     # don't smooth cycle numbers or temperatures.
                     continue
 
-                smoothed[key] = pd.rolling_mean(row, window)
+                # pd.rolling_mean doesn't work in recent versions of pandas.
+                smoothed[key] = row.rolling(window).mean()
 
         return PlateTimeCourse(smoothed)
 

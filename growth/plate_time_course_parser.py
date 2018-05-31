@@ -77,7 +77,7 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         
         # Some versions of Pandas have a default type of Object
         # for parsed files. We need to convert so we can do math.
-        return clipped_df.convert_objects(convert_numeric=True)
+        return clipped_df.infer_objects()
 
     def _splitFileToDataFrames(self, f, sheet_name=0):
         """Rather ad-hoc parsing of excel files using pandas..."""
@@ -85,7 +85,7 @@ class SavageLabM1000Excel(PlateTimeCourseParser):
         n_labels = 0
         single_label = None
 
-        df = pd.read_excel(f, sheetname=sheet_name)
+        df = pd.read_excel(f, sheet_name=sheet_name)
         for row in df.index:
             l = str(df.loc[row][0])
             match = self.LABELS_PATTERN.search(l)
