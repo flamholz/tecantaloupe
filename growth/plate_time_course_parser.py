@@ -2,6 +2,7 @@
 # -*- coding: iso-8859-15 -*-
 
 from growth.plate_time_course import PlateTimeCourse
+from xlrd import open_workbook
 
 import numpy as np
 import pandas as pd
@@ -255,7 +256,9 @@ class RectangularExcel(PlateTimeCourseParser):
     """For that annoying case where it comes out as a list of plate rectangles by accident."""
     COLS = list(map(str, np.arange(1, 13)))
     ROWS = 'A,B,C,D,E,F,G,H'.split(',')
-    LABEL = 'OD600'
+
+    def __init__(self, label='OD600'):
+        self.label = label
 
     def ParseFromFilename(self, f, sheet_name=0):
         """Concrete implementation.
@@ -290,7 +293,59 @@ class RectangularExcel(PlateTimeCourseParser):
         
         well_df = pd.DataFrame(well2series)
         merged_df = pd.concat(
-            [well_df], axis=1, keys=[self.LABEL],
+            [well_df], axis=1, keys=[self.label],
+            names=['measurement_type', 'well'])
+        return PlateTimeCourse(merged_df)
+
+
+class MultiMeasurementExcel(PlateTimeCourseParser):
+    """Multi-Measurement output with one table per well."""
+    COLS = list(map(str, np.arange(1, 13)))
+    ROWS = 'A,B,C,D,E,F,G,H'.split(',')
+
+    def __init__(self, label='OD600'):
+        self.label = label
+
+    def ParseFromFilename(self, f, sheet_name=0):
+        """Concrete implementation.
+
+        TODO: consistent keyword arg name for sheetname between us and pandas.
+        """
+        df = pd.read_excel(f, sheet_name=sheet_name)
+        cols = df.columns
+        pos_of_interest = np.where(df[cols[0]] == 'Cycles / Well')[0]
+
+        wells = [(r, c, '%s%s' % (r, c)) for c in self.COLS
+                 for r in self.ROWS]
+        well2series = dict((w[2], []) for w in wells)
+        well2series['time_s'] = []
+
+        for first_row, second_row in zip(pos_of_interest, pos_of_interest[1:]):
+            sub_df = df.iloc[first_row+1:second_row-1].copy()
+            wellname = sub_df.iloc[0][sub_df.columns[0]]
+
+            # Reset the index so we can grab data by names
+            sub_df.set_index(sub_df.columns[0], inplace=True)
+
+            time_s = sub_df.loc['Time [s]']
+            means = sub_df.loc['Mean']
+            assert wellname in well2series
+            well2series[wellname] = means.values.tolist()
+
+        # grab the last one:
+        sub_df = df.iloc[pos_of_interest[-1]+1:].copy()
+        wellname = sub_df.iloc[0][sub_df.columns[0]]
+
+        sub_df.set_index(sub_df.columns[0], inplace=True)
+        time_s = sub_df.loc['Time [s]']
+        means = sub_df.loc['Mean']
+        assert wellname in well2series
+        well2series[wellname] = means.values.tolist()
+        well2series['time_s'] = time_s.values.tolist()
+
+        well_df = pd.DataFrame(well2series)
+        merged_df = pd.concat(
+            [well_df], axis=1, keys=[self.label],
             names=['measurement_type', 'well'])
         return PlateTimeCourse(merged_df)
 
