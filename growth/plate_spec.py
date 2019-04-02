@@ -27,11 +27,13 @@ class PlateSpec(dict):
         self.cols = self.COLS
         self.rows = self.ROWS
 
-    def _all_wells(self):
-        return tuple(itertools.product(self.rows, self.cols))
+    @classmethod
+    def _all_wells(cls):
+        return tuple(itertools.product(cls.ROWS, cls.COLS))
 
-    def _all_well_names(self):
-        return tuple('%s%s' % (r, c) for r, c in self._all_wells())
+    @classmethod
+    def _all_well_names(cls):
+        return tuple('%s%s' % (r, c) for r, c in cls._all_wells())
 
     def well_to_name_mapping(self):
         """Returns a mapping from cells -> name."""

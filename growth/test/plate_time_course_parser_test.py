@@ -16,11 +16,11 @@ class PlateTimecourseParserTest(unittest.TestCase):
         # parsing a dataset with one measurement.
         parser = SavageLabM1000Excel()
         timecourse = parser.ParseFromFilename(
-            'growth/data/csosCA_inductiontest_08202017.xlsx')
+            'growth/data/example_growth.xlsx')
 
         df = timecourse._well_df
 
-        expected_wells = set(PlateSpec.ALL_WELL_NAMES)
+        expected_wells = set(PlateSpec._all_well_names())
         actual_wells = set(df['abs600'].columns)
         self.assertTrue('time_s' in actual_wells)
         self.assertTrue('temp_C' in actual_wells)
@@ -32,11 +32,11 @@ class PlateTimecourseParserTest(unittest.TestCase):
     def testMultipleParse(self):
         parser = SavageLabM1000Excel()
         timecourse = parser.ParseFromFilename(
-            'growth/data/Emeric05_12_17 C2C2 run 1.xlsx')
+            'growth/data/example_data_multimeasurement.xlsx')
 
         df = timecourse._well_df
 
-        expected_wells = set(PlateSpec.ALL_WELL_NAMES)
+        expected_wells = set(PlateSpec._all_well_names())
         actual_wells = set(df['GFP'].columns)
         self.assertTrue('time_s' in actual_wells)
         self.assertTrue('temp_C' in actual_wells)
