@@ -10,11 +10,10 @@ class PlateSpec(dict):
 
     TODO: make this generic for any plate size.
     """
-    
+
     COLS = list(map(str, np.arange(1, 13)))
     ROWS = 'A,B,C,D,E,F,G,H'.split(',')
-    ALL_WELLS = tuple(itertools.product(ROWS, COLS))
-    ALL_WELL_NAMES = tuple('%s%s' % (r, c) for r, c in ALL_WELLS)
+
 
     def __init__(self, df):
         """Initialize with a DataFrame describing the plate.
@@ -25,11 +24,19 @@ class PlateSpec(dict):
                 for format.
         """
         self.df = df
+        self.cols = self.COLS
+        self.rows = self.ROWS
+
+    def _all_wells(self):
+        return tuple(itertools.product(self.rows, self.cols))
+
+    def _all_well_names(self):
+        return tuple('%s%s' % (r, c) for r, c in self._all_wells())
 
     def well_to_name_mapping(self):
         """Returns a mapping from cells -> name."""
         mapping = dict()
-        for row, col in PlateSpec.ALL_WELLS:
+        for row, col in self._all_wells():
             s = '%s%s' % (row, col)
             n = self.df.name[col][row]
             mapping[s] = n
@@ -38,22 +45,21 @@ class PlateSpec(dict):
     def name_to_well_mapping(self):
         """Returns a mapping from name -> cells."""
         mapping = dict()
-        for row, col in PlateSpec.ALL_WELLS:
+        for row, col in self._all_wells():
             s = '%s%s' % (row, col)
             n = self.df.name[col][row]
             mapping.setdefault(n, []).append(s)
         return mapping
 
-    @staticmethod
-    def NullPlateSpec():
+    @classmethod
+    def NullPlateSpec(cls):
         """
         Returns an empty PlateSpec in the right format for 96 well plates.
         """
-        rows = PlateSpec.ROWS
-        cols = PlateSpec.COLS
+        rows = cls.ROWS
+        cols = cls.COLS
 
-        arrays = [['name'], cols]
-        tuples = list(PlateSpec.ALL_WELLS)
+        tuples = [('name', v) for v in cols]
 
         index = pd.MultiIndex.from_tuples(
             tuples, names=['value_type', 'column'])
@@ -66,10 +72,10 @@ class PlateSpec(dict):
             well_names.append(row_data)
 
         df = pd.DataFrame(well_names, index=rows, columns=index)
-        return PlateSpec(df)
+        return cls(df)
 
-    @staticmethod
-    def FromFile(f):
+    @classmethod
+    def FromFile(cls, f):
         """Assumes f is a CSV file.
 
         Args:
@@ -77,4 +83,19 @@ class PlateSpec(dict):
                 Better be in the right format.
         """
         df = pd.read_csv(f, header=[0, 1], index_col=[0])
-        return PlateSpec(df)
+        return cls(df)
+
+
+class PlateSpec384(PlateSpec):
+    """Read/write specifications for 384 well plates.
+
+    TODO: make this generic for any plate size.
+    """
+    COLS = list(map(str, np.arange(1, 25)))
+    ROWS = 'A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P'.split(',')
+    
+    def __init__(self, df):
+        super().__init__(df)
+
+        self.cols = PlateSpec384.COLS
+        self.rows = PlateSpec384.ROWS
