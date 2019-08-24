@@ -344,6 +344,7 @@ class MultiMeasurementExcel(PlateTimeCourseParser):
         well2series['time_s'] = time_s.values.tolist()
 
         well_df = pd.DataFrame(well2series)
+        well_df.replace({'INVALID': np.NAN, 'OVER': np.NAN}, inplace=True)
         merged_df = pd.concat(
             [well_df], axis=1, keys=[self.label],
             names=['measurement_type', 'well'])
